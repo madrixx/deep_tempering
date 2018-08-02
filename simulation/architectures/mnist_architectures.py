@@ -4,7 +4,8 @@ from __future__ import absolute_import
 import numpy as np
 import tensorflow as tf
 import collections
-
+#from simulation.device_placer import DevicePlacer
+#PLACER = DevicePlacer()
 from tensorflow.python.client import device_lib
 
 
