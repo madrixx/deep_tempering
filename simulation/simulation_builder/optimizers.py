@@ -17,10 +17,12 @@ class Optimizer(object):
 		self.worker_id = worker_id
 		self.noise_list = noise_list
 		self.tf_optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+		self.train_op = None
 
 	def minimize(self, loss):
 		grads_and_vars = self.compute_gradients(loss)
 		train_op = self.apply_gradients(grads_and_vars)
+		self.train_op = train_op
 		return train_op
 
 	def compute_gradients(self, loss):
@@ -44,6 +46,11 @@ class Optimizer(object):
 
 			train_op = tf.group(op)
 		return train_op
+
+	def get_train_op(self,):
+		if self.train_op is None:
+			raise ValueError('train_op is not set. Call minimize() to set.')
+		return self.train_op
 
 	def _get_dependencies(self, tensor):
 		
@@ -69,9 +76,8 @@ class Optimizer(object):
 class NormalNoiseGDOptimizer(Optimizer):
 
 	def __init__(self, learning_rate, worker_id, noise_list):
-		super(NormalNoiseGDOptimizer, self).__init__(	learning_rate, 
-														worker_id, 
-														noise_list)
+		super(NormalNoiseGDOptimizer, self).__init__(learning_rate, worker_id, 
+			noise_list)
 		self.noise_list = noise_list
 		self.n_routes = len(noise_list)
 		self.train_route_dict = {}
@@ -82,8 +88,7 @@ class NormalNoiseGDOptimizer(Optimizer):
 		for route, stddev in enumerate(self.noise_list):
 			with tf.name_scope('Route_' + str(route)):
 				self.train_route_dict[route] = self.apply_gradients(
-													grads_and_vars, 
-													stddev)
+					grads_and_vars, stddev)
 
 		return self.train_route_dict[self.current_route]
 
@@ -91,7 +96,8 @@ class NormalNoiseGDOptimizer(Optimizer):
 		"""Applies gradients and adds normal noise with `stddev`.
 		
 		Args:
-			grads_and_vars:	list of tuples as returned by optimizer.compute_gradients()
+			grads_and_vars:	list of tuples as returned by 
+				optimizer.compute_gradients()
 			stddev:			standard deviation of normal noise
 
 		Returns:
@@ -108,7 +114,8 @@ class NormalNoiseGDOptimizer(Optimizer):
 		self.current_route = route
 
 	def get_train_op(self,):
-		
+		if len(list(self.train_route_dict.keys())) == 0:
+			raise ValueError('train_op is not set. Call minimize() to set.')
 		return self.train_route_dict[self.current_route]
 
 class GDOptimizer(Optimizer):
