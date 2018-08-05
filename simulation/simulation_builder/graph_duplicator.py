@@ -7,10 +7,7 @@ from tensorflow.python.framework import ops
 from copy import deepcopy
 
 from simulation.simulation_builder.device_placer import _gpu_device_name
-'''
-from simulation.device_placer import DevicePlacer
-PLACER = DevicePlacer()
-'''
+
 copied_variables = {}
 
 def copy_and_duplicate(X, y, logits, n_duplicates, dst_graph, dropout_placeholder=None, namespace='Layers_'):
