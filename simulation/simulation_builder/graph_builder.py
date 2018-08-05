@@ -11,6 +11,11 @@ from simulation.simulation_builder.graph_duplicator import copy_and_duplicate
 from simulation.simulation_builder.optimizers import GDOptimizer
 from simulation.simulation_builder.optimizers import NormalNoiseGDOptimizer
 
+# if SUMMARY_TYPE is None, then stores per worker summary and 
+# ordered summaries. Can be only 'ordered_summary' or 'worker_summary'
+# or None
+SUMMARY_TYPE = None 
+
 class GraphBuilder(object):
 
 	def __init__(self, architecture, learning_rate, noise_list, name, noise_type='random_normal'):
@@ -70,17 +75,6 @@ class GraphBuilder(object):
 		self._loss_dict = {}
 		self._acc_dict = {}
 		self._optimizer_dict = {}
-		#self._train_op_dict = {}
-		#self._summ_dict = {} # summary
-		#self._train_writer_dict = {}
-		#self._test_writer_dict = {}
-		#self._validation_writer_dict = {}
-
-		# _dir is a helper class for generating directory names
-		#self._dir = Dir(self._log_dir, self._name) 
-		#self._dir.clean_dirs(self._log_dir)
-
-		
 
 		with self._graph.as_default():
 			for i in range(self._n_workers):
@@ -102,10 +96,12 @@ class GraphBuilder(object):
 											noise_list=self._noise_list)
 					self._optimizer_dict[i] = optimizer
 					optimizer.minimize(self._loss_dict[i])
-					#self._train_op_dict[i] = optimizer.minimize(self._loss_dict[i])
+			
+			self.summary = Summary(self.graph, self._n_workers, self._name, 
+				self._loss_dict, self._acc_dict, self._noise_list)
 
-			#self._create_summaries()
 			self.variable_initializer = tf.global_variables_initializer()
+
 
 	def create_feed_dict(self, X_batch, y_batch, test=False):
 
@@ -128,17 +124,44 @@ class GraphBuilder(object):
 		
 		loss = [self._loss_dict[i] for i in range(self._n_workers)]
 		accuracy = [self._acc_dict[i] for i in range(self._n_workers)]
-		
+		summary = self.summary.get_summary_ops()
+
 		if test:
-			return loss + accuracy
+			return loss + accuracy + summary
 		
 		train_op = [self._optimizer_dict[i].get_train_op() 
 			for i in range(self._n_workers)]
 
-		#train_op = [self._train_op_dict[i] for i in range(self._n_workers)]
+		return loss + accuracy + summary + train_op
 
-		return loss + accuracy + train_op
+	def add_summary(self, evaluated, step, dataset_type='train'):
+		
 
+		def add_worker_summary():
+
+			summary = self.extract_evaluated_tensors(evaluated, 'summary')
+			writer = self.summary.get_summary_writer(dataset_type, 
+				'worker_summary')
+			
+			noise_dict = self.summary.worker_noise_dict
+
+			feed_dict = {noise_dict[i]:self._curr_noise_dict[i]
+				for i in range(self._n_workers)}
+			for i in range(self._n_workers):
+				#writer[i].add_summary(summary[i], step)
+				feed_dict[i]
+		def add_ordered_summary():
+
+			accuracy = self.extract_evaluated_tensors(evaluated, 'accuracy')
+			loss = self.extract_evaluated_tensors(evaluated, 'loss')
+
+			loss_acc_id = [(l, a, i) 
+				for l, a, i in zip(loss, accuracy, range(self._n_workers))]
+			loss_acc_id.sort(key=lambda x: x[0])
+
+			feed_dict = {}
+			for i in range(self._n_workers):
+				feed_dict[]
 	def extract_evaluated_tensors(self, evaluated, tensor_type):
 		
 		if tensor_type == 'loss':
@@ -146,6 +169,9 @@ class GraphBuilder(object):
 		
 		elif tensor_type == 'accuracy':
 			return evaluated[self._n_workers:2*self._n_workers]
+
+		elif tensor_type == 'summary':
+			return evaluated[2*self._n_workers:3*self._n_workers]
 
 	def update_noise_vals(self, evaluated):
 		"""Updates noise values based on loss function.
@@ -199,35 +225,112 @@ class GraphBuilder(object):
 class Summary(object):
 	"""Helper class for creating summaries."""
 
-	def __init__(self, n_workers, name):
+	def __init__(self, graph, n_workers, name, loss_dict, acc_dict, 
+		noise_list, summary_type=None):
+		self.graph = graph
 		self.n_workers = n_workers
 		self.log_dir = os.path.abspath(
 			'/'.join(__file__.split('/')[:-2])) + '/summaries/' + name + '/'
 		self.name = name
 		self.dir = Dir(self.log_dir)
+		self.summary_type = summary_type
+		
+		self.writer_dict = {
+			'train_ordered':{},
+			'test_ordered':{},
+			'valid_ordered':{},
+			'train_worker':{},
+			'test_worker':{},
+			'valid_worker':{}
+		}
 
-	def _add_summary_scalar(self, name, tensor, collections):
-		if type(collections) is not list:
-			collections = [collections]
-		tf.summary.scalar(name, tensor, collections=collections)
+		self.ordered_summary = {}
+		self.worker_summary = {}
+	
+	def get_summary_ops(self):
+		#ordered_summ = [self.ordered_summary[i] for i in range(self.n_workers)]
+		if SUMMARY_TYPE == 'ordered_summary':
+			return []
+
+		worker_summ = [self.worker_summary[i] for i in range(self.n_workers)]
+		return worker_summ
+
+	def get_summary_writer(dataset_type, summary_type):
+		if summary_type == 'worker_summary':
+			if dataset_type == 'train':
+				return self.writer_dict['train_worker']
+			elif dataset_type == 'test':
+				return self.writer_dict['test_worker']
+			elif dataset_type == 'validation':
+				return self.writer_dict['valid_worker']
+			else:
+				raise ValueError("""dataset_type can be one of `train`, `test`
+					or `validation`.""")
+		elif summary_type == 'ordered_summary':
+			if dataset_type == 'train':
+				return self.writer_dict['train_ordered']
+			elif dataset_type == 'test':
+				return self.writer_dict['test_ordered']
+			elif dataset_type == 'validation':
+				return self.writer_dict['valid_ordered']
+			else:
+				raise ValueError("""dataset_type can be one of `train`, `test`
+					or `validation`.""")
+		else:
+			raise ValueError("""`summary_type can be `worker_summary` or
+				ordered_summary'""")
+
+	def create_worker_summaries(self, loss_dict, acc_dict):
+		# create per-worker summary scalars and per worker summary writers
+
+		# worker_noise_dict stores placeholdes for values for specific 
+		# worker
+		self.worker_noise_dict = {}
+		with tf.name_scope('Summary'):
+			for i in range(self.n_workers):
+				tf.summary.scalar('loss', loss_dict[i], collections=[i])
+				tf.summary.scalar('accuracy', acc_dict[i], collections=[i])
+				self.worker_noise_dict[i] = tf.placeholder_with_default(0.0, 
+					shape=[])
+				tf.summary.scalar('noise', self.worker_noise_dict[i], 
+					collections=[i])
+				self.worker_summary[i] = tf.summary.merge_all(i)
+
+				self.writer_dict['train_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_train_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['test_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_test_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['valid_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_validation_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
 
 	def create_ordered_summaries(self, ):
 
-		# create summary scalars
-		self.ordered_summary = ({'pholders':{'accuracy':{}, 'loss':{}, 
-			'noise':{} }, 'summaries':{}})
+		# create ordered summary scalars and ordered summary writers
+		with tf.name_scope('Summary'):
+			self.ordered_summary = ({'pholders':{'accuracy':{}, 'loss':{}, 
+				'noise':{} }, 'summaries':{}})
 
-		self.ordered_summary['pholders']['accuracy'] = {
-			i:tf.placeholder_with_default(0.0, shape=[]) for i in range(self.n_workers)
-		}
-		self.ordered_summary['pholders']['loss'] = {
-			i:tf.placeholder_with_default(0.0, shape=[]) for i in range(self.n_workers)
-		}
-		self.ordered_summary['pholders']['noise'] = {
-			i:tf.placeholder_with_default(0.0, shape=[]) for i in range(self.n_workers)
-		}
-		for i in range(self.n_workers):
-			with tf.name_scope('Ordered_summary_' + str(i)):
+			self.ordered_summary['pholders']['accuracy'] = {
+				i:tf.placeholder_with_default(0.0, shape=[]) 
+				for i in range(self.n_workers)
+			}
+			self.ordered_summary['pholders']['loss'] = {
+				i:tf.placeholder_with_default(0.0, shape=[]) 
+				for i in range(self.n_workers)
+			}
+			self.ordered_summary['pholders']['noise'] = {
+				i:tf.placeholder_with_default(0.0, shape=[]) 
+				for i in range(self.n_workers)
+			}
+
+			for i in range(self.n_workers):
+				
 				tf.summary.scalar('loss', 
 					self.ordered_summary['pholders']['loss'][i], 
 					collections=[i+self.n_workers])
@@ -239,14 +342,22 @@ class Summary(object):
 				tf.summary.scalar('noise',
 					self.ordered_summary['pholders']['noise'][i],
 					collections=[i+self.n_workers])
-				self.ordered_summary['summaries'][i] = tf.summary.merge_all(i+self.n_workers)
-
-		# create summary writers
-		#for i in range(self.n_workers):
-		#	self.train_writer[]
-
-
-
+				
+				self.ordered_summary['summaries'][i] = 
+					(tf.summary.merge_all(i+self.n_workers))
+			
+				self.writer_dict['train_ordered'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_ordered_train_dir(i),
+					graph=self.graph, 
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['test_ordered'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_ordered_test_dir(i),
+					graph=self.graph, 
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['valid_ordered'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_ordered_validation_dir(i),
+					graph=self.graph, 
+					filename_suffix=self.dir.get_filename_suffix())
 
 class Dir(object):
 	"""Helper class for generating directory names."""
