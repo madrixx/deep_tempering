@@ -22,16 +22,17 @@ class GraphBuilder(object):
 		
 		self._architecture = architecture
 		self._learning_rate = learning_rate
-		self._noise_list = (sorted(noise_list) 	if noise_type == 'random_normal'
-												else sorted(noise_list, reverse=True))
 		self._n_workers = len(noise_list)
 		self._noise_type = noise_type
 		self._name = name
 		self._graph = tf.Graph()
-
+		self._noise_list = (sorted(noise_list) 
+			if noise_type == 'random_normal' 
+			else sorted(noise_list, reverse=True))
+		#
 		# create graph with duplicates based on architecture function 
 		# and noise type
-
+		
 		try:
 			res = self._architecture(tf.Graph())
 			if (len(res) == 3 and 
@@ -53,25 +54,24 @@ class GraphBuilder(object):
 				self._probs_dict = {i:p for i, p in enumerate(probs)}
 				
 				# in case of noise_type == dropout, _curr_noise_dict stores
-				# probabilities for keeping parameters:
-				# {worker_id:keep_proba}
+				# probabilities for keeping optimization parameters 
+				# (W's and b's): {worker_id:keep_proba}
 				self._curr_noise_dict = {i:n 
 					for i, n in enumerate(sorted(self._noise_list, reverse=True))}
-
 
 			else: 
 				raise ValueError()
 
-		except ValueError:
-			raise ValueError('`architecture` function must return' + \
-			 	' 4 variables for noise_type `dropout` and' + \
-				' 3 variables for noise_type `random_normal`')
+		except ValueError as exc:
+			raise ValueError("""`architecture` function must return 
+			 	4 variables for noise_type `dropout` and 
+				3 variables for noise_type `random_normal`""") from exc
 
 		except:
 			raise
-
+		#
 		# from here, whole net that goes after logits is created
-			
+
 		self._loss_dict = {}
 		self._acc_dict = {}
 		self._optimizer_dict = {}
@@ -81,32 +81,52 @@ class GraphBuilder(object):
 				
 				with tf.name_scope('LossAccuracy_' + str(i)):
 					
-					self._loss_dict[i] = self._cross_entropy_loss(	self.y, 
-																	logits_list[i])
+					self._loss_dict[i] = self._cross_entropy_loss(self.y, 
+						logits_list[i])
 					
-					self._acc_dict[i] = self._accuracy(	self.y, 
-														logits_list[i])
+					self._acc_dict[i] = self._accuracy(self.y, 
+						logits_list[i])
 
 				with tf.name_scope('Optimizer_' + str(i)):
 
-					Optimizer = (NormalNoiseGDOptimizer if noise_type == 'random_normal'
-														else GDOptimizer)
-					optimizer = Optimizer(	self._learning_rate, 
-											i,
-											noise_list=self._noise_list)
+					Optimizer = (NormalNoiseGDOptimizer 
+						if noise_type == 'random_normal' else GDOptimizer)
+
+					optimizer = Optimizer(self._learning_rate, i,
+						noise_list=self._noise_list)
+					
 					self._optimizer_dict[i] = optimizer
 					optimizer.minimize(self._loss_dict[i])
 			
-			self.summary = Summary(self.graph, self._n_workers, self._name, 
+			self._summary = Summary(self.graph, self._n_workers, self._name, 
 				self._loss_dict, self._acc_dict, self._noise_list)
 
 			self.variable_initializer = tf.global_variables_initializer()
 
 
 	def create_feed_dict(self, X_batch, y_batch, test=False):
+		"""Creates feed_dict for session run.
 
+		Args:
+			X_batch: input X training batch
+			y_batch: input y training batch
+			test: if True, sets dropout probabilities to 1.0 in case
+				of noise_type==dropout. In case of
+				noise_type==random_normal doesn't do anything.
+		
+		Returns:
+			A dictionary to feed into session run.
+		"""
 		feed_dict = {self.X:X_batch, self.y:y_batch}
 
+		# placeholders to store noise values for each worker
+		if ((SUMMARY_TYPE == None or
+			SUMMARY_TYPE == 'worker_summary') and
+			not test):
+
+			d = {self._summary.worker_noise_dict[i]:self._curr_noise_dict[i]
+				for i in range(self._n_workers)}
+			feed_dict
 		if self._noise_type == 'dropout':
 			
 			if test:
@@ -121,7 +141,19 @@ class GraphBuilder(object):
 		return feed_dict
 
 	def get_train_ops(self, test=False):
+		"""Returns train ops for session's run.
+
+		The returned list should be used as:
+		# evaluated = sess.run(get_train_ops(), feed_dict=...)
 		
+		Args:
+			test: if True, doesn't include ops for optimizing gradients 
+				in the returned list.
+
+		Returns:
+			train_ops for session run.
+		"""
+
 		loss = [self._loss_dict[i] for i in range(self._n_workers)]
 		accuracy = [self._acc_dict[i] for i in range(self._n_workers)]
 		summary = self.summary.get_summary_ops()
@@ -134,22 +166,22 @@ class GraphBuilder(object):
 
 		return loss + accuracy + summary + train_op
 
-	def add_summary(self, evaluated, step, dataset_type='train'):
+	def add_summary(self, evaluated, step, session=None, dataset_type='train'):
 		
 
 		def add_worker_summary():
 
 			summary = self.extract_evaluated_tensors(evaluated, 'summary')
-			writer = self.summary.get_summary_writer(dataset_type, 
+			writer = self._summary.get_summary_writer(dataset_type, 
 				'worker_summary')
 			
-			noise_dict = self.summary.worker_noise_dict
+			noise_dict = self._summary.worker_noise_dict
 
 			feed_dict = {noise_dict[i]:self._curr_noise_dict[i]
 				for i in range(self._n_workers)}
 			for i in range(self._n_workers):
 				#writer[i].add_summary(summary[i], step)
-				feed_dict[i]
+				feed_dict[i] 
 		def add_ordered_summary():
 
 			accuracy = self.extract_evaluated_tensors(evaluated, 'accuracy')
@@ -162,6 +194,7 @@ class GraphBuilder(object):
 			feed_dict = {}
 			for i in range(self._n_workers):
 				feed_dict[]
+	
 	def extract_evaluated_tensors(self, evaluated, tensor_type):
 		
 		if tensor_type == 'loss':
@@ -218,7 +251,6 @@ class GraphBuilder(object):
 
 	
 
-	#def _create_summaries(self):
 
 
 
@@ -255,7 +287,44 @@ class Summary(object):
 		worker_summ = [self.worker_summary[i] for i in range(self.n_workers)]
 		return worker_summ
 
-	def get_summary_writer(dataset_type, summary_type):
+	def create_worker_summary(self):
+
+		with tf.name_scope('Summary'):
+			for i in range(self.n_workers):
+				train_collect = ['train'+str(i)]
+				test_collect = ['test'+str(i)]
+				valid_collect = ['validation'+str(i)]
+
+				tf.summary.scalar('loss', loss_dict[i], 
+					collections=train_collect+test_collect+valid_collect)
+				tf.summary.scalar('accuracy', acc_dict[i], 
+					collections=train_collect+test_collect+valid_collect)
+				self.worker_noise_dict[i] = tf.placeholder_with_default(0.0, 
+					shape=[])
+				tf.summary.scalar('noise', self.worker_noise_dict[i],
+					collections=train_collect)
+
+				self.train_summ_worker[i] = tf.summary.merge_all(
+					collections=train_collect)
+				self.test_summ_worker[i] = tf.summary.merge_all(
+					collections=test_collect)
+				self.valid_summ_worker[i] = tf.summary.merge_all(
+					collections=valid_collect)
+
+				self.writer_dict['train_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_train_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['test_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_test_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
+				self.writer_dict['valid_worker'][i] = tf.summary.FileWriter(
+					logdir=self.dir.get_validation_dir(i),
+					graph=self.graph,
+					filename_suffix=self.dir.get_filename_suffix())
+
+	def get_summary_writer(self, dataset_type, summary_type):
 		if summary_type == 'worker_summary':
 			if dataset_type == 'train':
 				return self.writer_dict['train_worker']
@@ -282,7 +351,7 @@ class Summary(object):
 
 	def create_worker_summaries(self, loss_dict, acc_dict):
 		# create per-worker summary scalars and per worker summary writers
-
+		#
 		# worker_noise_dict stores placeholdes for values for specific 
 		# worker
 		self.worker_noise_dict = {}
