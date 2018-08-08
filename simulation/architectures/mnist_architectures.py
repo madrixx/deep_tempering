@@ -7,7 +7,7 @@ import collections
 #from simulation.device_placer import DevicePlacer
 #PLACER = DevicePlacer()
 from tensorflow.python.client import device_lib
-
+from simulation.simulation_builder.device_placer import _gpu_device_name
 
 
 def nn_mnist_architecture(graph):
@@ -86,6 +86,20 @@ def nn_layer(X, n_neurons, name, activation=None):
 				return activation(Z)
 			else:
 				return Z
+def conv2d_layer(X, filter_shape, strides, name, padding='SAME', activation=None):
+
+	with tf.device(_gpu_device_name(0)):
+		with tf.name_scope(name):
+			init = tf.truncated_normal(filter_shape, stddev=1e-4)
+			kernel = tf.Variable(init, name='W')
+			conv = tf.nn.conv2d(X, kernel, strides, padding=padding, name=name)
+			biases = tf.Variable(tf.zeros([filter_shape[-1]]))
+			Z = tf.nn.bias_add(conv, biases)
+			if activation is not None:
+				return activation(Z)
+			else:
+				return Z
+
 
 def cnn_mnist_architecture(graph):
 	height = 28
@@ -203,3 +217,4 @@ def _get_default_gpu_name():
 	gpus = _get_available_gpus()
 	
 	return gpus[0] if len(gpus) > 0 else '/cpu:0'
+
