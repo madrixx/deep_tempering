@@ -110,8 +110,8 @@ def cnn_cifar10_architecture(graph):
 def cnn_cifar10_architecture3(graph):
 	height = 32
 	width = 32
-	channels = 1
-	n_inputs = height * width
+	channels = 3
+	n_inputs = height * width * channels
 
 	conv1_fmaps = 32
 	conv1_ksize = 3

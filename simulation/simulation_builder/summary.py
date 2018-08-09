@@ -2,11 +2,7 @@ import os
 import tensorflow as tf
 
 
-def InvalidDatasetTypeError(Exception):
-	pass
-	def __str__(self, ):
-		return """The dataset_type must be one of: 'train', 'test' or 
-			'validation'"""
+from simulation.simulator_exceptions import InvalidDatasetTypeError
 
 def sort_py_func(a):
     return a[a[:,0].argsort()]
@@ -131,6 +127,7 @@ class Summary(object):
 	def get_summary_ops(self, dataset_type):
 		summs = []
 		N = self.n_workers
+		
 		if (self.summary_type is None 
 			or self.summary_type=='worker_summary'):
 			
@@ -195,6 +192,17 @@ class Summary(object):
 		else:
 			raise ValueError("""`summary_type can be `worker_summary` or
 				ordered_summary'""")
+
+	def flush_summary_writer(self):
+		for i in self.writer_dict:
+			for k in self.writer_dict[i]:
+				self.writer_dict[i][k].close()
+
+	def close_summary_writer(self):
+		for i in self.writer_dict:
+			for k in self.writer_dict[i]:
+				self.writer_dict[i][k].close()
+
 
 class Dir(object):
 	"""Helper class for generating directory names."""

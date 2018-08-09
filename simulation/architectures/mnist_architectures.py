@@ -27,25 +27,25 @@ def nn_mnist_architecture(graph):
 				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
 			with tf.name_scope('y'):
 				y = tf.placeholder(tf.int64, shape=(None), name='y')
-		with tf.name_scope('NN'):
+		#with tf.name_scope('NN'):
 
 			
-			hidden1 = nn_layer(	
-				X, 
-				n_hidden1, 
-				name='hidden1', 
-				activation=tf.nn.relu)
-			
-			hidden2 = nn_layer(
-				hidden1,
-				n_hidden2,
-				name='hidden2',
-				activation=tf.nn.relu)
-			
-			logits = nn_layer(
-				hidden2,
-				n_outputs,
-				name='logits')
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden2,
+			n_outputs,
+			name='logits')
 	return X, y, logits
 
 
@@ -72,7 +72,7 @@ def nn_layer(X, n_neurons, name, activation=None):
 		stddev = 2.0 / np.sqrt(n_inputs)
 		init = tf.truncated_normal((n_inputs, n_neurons), stddev=stddev)
 
-		with tf.device(gpu_device_name):
+		with tf.device(_gpu_device_name(0)):
 			W = tf.Variable(init, name='W')
 			
 			
@@ -105,7 +105,7 @@ def cnn_mnist_architecture(graph):
 	height = 28
 	width = 28
 	channels = 1
-	n_inputs = height * width
+	n_inputs = height * width * channels
 
 	conv1_fmaps = 32
 	conv1_ksize = 3

@@ -11,7 +11,11 @@ from simulation.simulation_builder.graph_duplicator import copy_and_duplicate
 from simulation.simulation_builder.optimizers import GDOptimizer
 from simulation.simulation_builder.optimizers import NormalNoiseGDOptimizer
 from simulation.simulation_builder.summary import Summary
-from simulation.simulation_builder.summary import InvalidDatasetTypeError
+from simulation.simulator_exceptions import InvalidDatasetTypeError
+from simulation.simulator_exceptions import InvalidArchitectureFuncError
+
+__DEBUG__ = True
+
 'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
 class GraphBuilder(object):
 
@@ -30,8 +34,8 @@ class GraphBuilder(object):
 		self._summary_type = summary_type
 		#
 		# create graph with duplicates based on architecture function 
-		# and noise type
-		
+		# and noise typetrain_collect
+		res = []
 		try:
 			res = self._architecture(tf.Graph())
 			if (len(res) == 3 and 
@@ -65,18 +69,14 @@ class GraphBuilder(object):
 					for i, n in enumerate(sorted(self._noise_list, reverse=True))}
 
 			else: 
-				raise ValueError()
-
-		except Exception as exc:
-			raise ValueError("""`architecture` function must return 
-				4 variables for noise_type `dropout` and 
-				3 variables for noise_type `random_normal`""") from exc
+				raise InvalidArchitectureFuncError(len(res), self.noise_type)
 
 		except:
 			raise
+
 		#
 		# from here, whole net that goes after logits is created
-
+		self.__DEBUG__logits_list = logits_list
 		self._loss_dict = {}
 		self._acc_dict = {}
 		self._optimizer_dict = {}
@@ -170,6 +170,7 @@ class GraphBuilder(object):
 		elif dataset_type == 'train':
 			train_op = [self._optimizer_dict[i].get_train_op() 
 				for i in range(self._n_workers)]
+			if __DEBUG__: train_op = train_op + self.__DEBUG__logits_list
 			return loss + accuracy + summary + train_op
 		else:
 			raise InvalidDatasetTypeError()
@@ -214,7 +215,7 @@ class GraphBuilder(object):
 			for i, li in enumerate(losses_and_ids):
 				self._optimizer_dict[li[1]].set_train_route(i)
 
-		#sys.exit()
+	def get_tf_graph(self): return self._graph
 		
 	def _store_tensorflow_graph(self, path): tf.summary.FileWriter(path, self.graph).close()
 	
