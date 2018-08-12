@@ -21,31 +21,6 @@ class Cifar10(object):
 		self.batch_size = batch_size
 		self._download_and_extract()
 		self._prepare_dataset()
-		'''
-		self.X = X
-		self.y = y
-		self.train_dataset = tf.data.Dataset.from_tensor_slices((self.X, self.y))
-		self.train_dataset = self.train_dataset.batch(self.batch_size)
-
-		self.iterator = self.train_dataset.make_initializable_iterator()
-		'''
-		'''
-		self.train_dataset = tf.data.Dataset.from_tensor_slices({
-			'X':self.train_data,
-			'y':self.train_labels}).batch(self.batch_size)
-
-		self.test_dataset = tf.data.Dataset.from_tensor_slices({
-			'X':self.test_data,
-			'y':self.test_labels})
-		self.valid_dataset = tf.data.Dataset.from_tensor_slices({
-			'X':self.valid_data,
-			'y':self.valid_labels})
-
-		self.iterator = self.train_dataset.make_initializable_iterator()
-		'''
-		
-
-
 
 	def _prepare_dataset(self):
 		"""
@@ -123,11 +98,13 @@ class Cifar10(object):
 		self.cifar10_dir = extracted_dir_path
 	
 	
-def get_cifar10_data():
+def get_cifar10_data(validation_size=0.1, random_state=None):
 	c = Cifar10()
 	X_test, y_test = c.test_data, c.test_labels
 
 	X_train, X_valid, y_train, y_valid = train_test_split(c.train_data, 
-		c.train_labels, test_size=0.1, random_state=random.randint(1, 42))
+		c.train_labels, test_size=validation_size, 
+		random_state=(random_state 
+			if random_state is not None else random.randint(1, 42)))
 
 	return X_train, y_train, X_test, y_test, X_valid, y_valid

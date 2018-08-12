@@ -4,6 +4,8 @@ import tensorflow as tf
 
 from simulation.simulation_builder.summary import Dir
 
+__DEBUG__ = False
+
 def extract_summary(name, tag):
 	"""Extracts summaries from simulation `name`
 
@@ -31,4 +33,6 @@ def extract_summary(name, tag):
 							res[file].append(v.simple_value)
 
 	return res
+
+
 

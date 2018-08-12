@@ -13,8 +13,7 @@ from simulation.simulation_builder.optimizers import NormalNoiseGDOptimizer
 from simulation.simulation_builder.summary import Summary
 from simulation.simulator_exceptions import InvalidDatasetTypeError
 from simulation.simulator_exceptions import InvalidArchitectureFuncError
-
-__DEBUG__ = True
+from simulation.simulator_utils import __DEBUG__
 
 'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
 class GraphBuilder(object):
@@ -32,9 +31,8 @@ class GraphBuilder(object):
 			if noise_type == 'random_normal' 
 			else sorted(noise_list, reverse=True))
 		self._summary_type = summary_type
-		#
 		# create graph with duplicates based on architecture function 
-		# and noise typetrain_collect
+		# and noise type 
 		res = []
 		try:
 			res = self._architecture(tf.Graph())
@@ -74,7 +72,6 @@ class GraphBuilder(object):
 		except:
 			raise
 
-		#
 		# from here, whole net that goes after logits is created
 		self.__DEBUG__logits_list = logits_list
 		self._loss_dict = {}
@@ -179,8 +176,6 @@ class GraphBuilder(object):
 		summs = self.extract_evaluated_tensors(evaluated, 'summary')
 		self._summary.add_summary(summs, step, dataset_type)
 
-		
-	
 	def extract_evaluated_tensors(self, evaluated, tensor_type):
 		
 		if tensor_type == 'loss':
@@ -203,6 +198,7 @@ class GraphBuilder(object):
 		Args:
 			evaluated: a list as returned by sess.run(get_train_ops())
 		"""
+
 		loss_list = self.extract_evaluated_tensors(evaluated, 'loss')
 		losses_and_ids = [(l, i) for i, l in enumerate(loss_list)]
 		

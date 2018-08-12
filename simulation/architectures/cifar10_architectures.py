@@ -9,15 +9,6 @@ import collections
 from simulation.architectures.mnist_architectures import nn_layer, conv2d_layer
 from simulation.simulation_builder.device_placer import _gpu_device_name
 
-'''
-def nn_cifar10_architecture(graph):
-
-	with graph.as_default():
-		with tf.name_scope('Inputs'):
-			with tf.name_scope('X'):
-				#X = tf.placeholder(tf.float32, shape=)
-
-'''
 def cnn_cifar10_architecture(graph):
 
 	with graph.as_default():
@@ -104,6 +95,69 @@ def cnn_cifar10_architecture(graph):
 
 			with tf.name_scope('logits'):
 				logits = nn_layer(fc2_dropout, 10, 'logits')
+
+	return X, y, keep_prob, logits
+
+
+def cnn_cifar10_architecture4(graph):
+	height = 32
+	width = 32
+	channels = 3
+	n_inputs = height * width * channels
+
+	conv1_fmaps = 32
+	conv1_ksize = 3
+	conv1_stride = 1
+	conv1_pad = "SAME"
+
+	conv2_fmaps = 64
+	conv2_ksize = 3
+	conv2_stride = 2
+	conv2_pad = "SAME"
+
+	pool3_fmaps = conv2_fmaps
+
+	n_fc1 = 64
+	n_outputs = 10
+
+	gpu_device_name = _gpu_device_name(0)
+
+	with graph.as_default():
+		with tf.name_scope('Input'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=[None, n_inputs], 
+					name='X')
+				X_reshaped = tf.reshape(X, 
+				shape=[-1, height, width, channels])
+		with tf.name_scope('y'):
+			y = tf.placeholder(tf.int32, shape=[None], name='y')
+		with tf.device(gpu_device_name):
+			with tf.name_scope('conv1'):
+				conv1 = tf.layers.conv2d(X_reshaped, filters=conv1_fmaps, 
+					kernel_size=conv1_ksize, strides=conv1_stride, 
+					padding=conv1_pad, activation=tf.nn.relu, name='conv1')
+
+			with tf.name_scope('conv2'):
+				conv2 = tf.layers.conv2d(conv1, filters=conv2_fmaps, 
+					kernel_size=conv2_ksize, strides=conv2_stride, 
+					padding=conv2_pad, activation=tf.nn.relu, name='conv2')
+
+			with tf.name_scope('pool3'):
+				pool3 = tf.nn.max_pool(conv2, ksize=[1, 2, 2, 1], 
+					strides=[1, 2, 2, 1], padding='VALID')
+				s1, s2 = pool3.get_shape().as_list()[1], pool3.get_shape().as_list()[2]
+				pool3_flat = tf.reshape(pool3, shape=[-1, pool3_fmaps * s1 * s2])
+
+			with tf.name_scope('fully_connected'):
+				fc = nn_layer(pool3_flat, n_fc1, activation=tf.nn.relu, name='fc')
+
+		with tf.device(gpu_device_name):
+			with tf.name_scope('dropout'):
+				keep_prob = tf.placeholder(tf.float32, name='keep_prob')
+				fc_dropout = tf.nn.dropout(fc, keep_prob)
+
+			with tf.name_scope('logits'):
+				logits = tf.layers.dense(fc_dropout, n_outputs, name='logits')
 
 	return X, y, keep_prob, logits
 
