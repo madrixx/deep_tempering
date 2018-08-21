@@ -73,9 +73,9 @@ def copy_variable_to_graph(org_instance, to_graph, namespace):
 
 	###############################################################
 	if namespace != '':
-		worker_id = int(namespace.split('_')[1])
+		replica_id = int(namespace.split('_')[1])
 	else: 
-		worker_id = -1
+		replica_id = -1
  	###############################################################
 	#Get the collections that the new instance needs to be added to.
 	#The new collections will also be a part of the given namespace,
@@ -112,9 +112,9 @@ def copy_variable_to_graph(org_instance, to_graph, namespace):
 														validate_shape=True)
 		'''	
 		######################################################
-		if (worker_id >= 0 and 
+		if (replica_id >= 0 and 
 			'gpu' in org_instance.device.lower()):
-			device_name = _gpu_device_name(worker_id)
+			device_name = _gpu_device_name(replica_id)
 		else:
 			device_name = '/cpu:0'
 
@@ -135,9 +135,9 @@ def copy_variable_to_graph(org_instance, to_graph, namespace):
 	#Add to the copied_variables dict
 	copied_variables[new_var.name] = new_var
 	'''
-	if (worker_id >=0 and 
+	if (replica_id >=0 and 
 		'gpu' in org_instance.device.lower()):
-		new_var._set_device(_gpu_device_name(worker_id))
+		new_var._set_device(_gpu_device_name(replica_id))
 	'''
 	#print('var:', org_instance.device, new_var.device)
 	
@@ -170,9 +170,9 @@ def copy_to_graph(org_instance, to_graph, namespace="", exclude=None):
 
 	####################################################################
 	if namespace != '':
-		worker_id = int(namespace.split('_')[1])
+		replica_id = int(namespace.split('_')[1])
 	else: 
-		worker_id = -1
+		replica_id = -1
 	global copied_variables
 	if exclude:
 		for e in exclude:
@@ -287,14 +287,14 @@ def copy_to_graph(org_instance, to_graph, namespace="", exclude=None):
 			new_op._set_device(device_function(new_op))
 			#########################################################
 			#print(device_function(new_op))
-			#new_op = PLACER.set_on_gpu(new_op, worker_id) 
+			#new_op = PLACER.set_on_gpu(new_op, replica_id) 
 			########################################################
 
 		########################################################
 		
-		if (worker_id >= 0 and 
+		if (replica_id >= 0 and 
 			'gpu' in op.device.lower()):
-			new_op._set_device(_gpu_device_name(worker_id))
+			new_op._set_device(_gpu_device_name(replica_id))
 			#print('op:', op.device, new_op.device)
 		
 		return new_op
