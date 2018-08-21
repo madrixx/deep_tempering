@@ -11,8 +11,8 @@ class InvalidArchitectureFuncError(Exception):
 	def __init__(self, len_res, noise_type):
 		self.len_res = str(len_res)
 		self.noise_type = str(noise_type)
-		msg = "`architecture` function must return 4 variables if noise_type is "
-		msg = msg + "'random_normal' and 3 variables if `noise_type` is 'dropout'. "
+		msg = "`architecture` function must return 3 variables if noise_type is "
+		msg = msg + "'random_normal'/'betas'  and 4 variables if `noise_type` is 'dropout'. "
 		msg = msg + "The given `architecture` function returns " + self.len_res
 		msg = msg + " variables and given `noise_type` is " + "'" + self.noise_type + "'"
 		self.msg = msg
@@ -31,4 +31,13 @@ class NoGpusFoundError(Exception):
 
 	def __str__(self):
 		
+		return self.msg
+
+class InvalidLossFuncError(Exception):
+	pass
+	def __init__(self):
+		msg = 'Invalid loss function. Possible functions are: `cross_entropy` and `zero_one_loss`'
+		self.msg = msg
+
+	def __str__(self):
 		return self.msg
