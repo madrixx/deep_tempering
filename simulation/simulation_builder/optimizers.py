@@ -7,14 +7,15 @@ from tensorflow.python.framework import ops
 import collections
 import random
 import sys
+import numpy as np
 
 from simulation.simulation_builder.device_placer import _gpu_device_name
 
 class Optimizer(object):
 	"""Wrapper for tf.train.GradientDescentOptimizer"""
-	def __init__(self, learning_rate, worker_id, noise_list=None):
+	def __init__(self, learning_rate, replica_id, noise_list=None):
 		self.learning_rate = learning_rate
-		self.worker_id = worker_id
+		self.replica_id = replica_id
 		self.noise_list = noise_list
 		self.tf_optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
 		self.train_op = None
@@ -27,7 +28,7 @@ class Optimizer(object):
 
 	def compute_gradients(self, loss):
 		var_list = self._get_dependencies(loss)
-		with tf.device(_gpu_device_name(self.worker_id)):
+		with tf.device(_gpu_device_name(self.replica_id)):
 			grads_and_vars = self.tf_optimizer.compute_gradients(loss, var_list)
 		return grads_and_vars
 
@@ -40,7 +41,7 @@ class Optimizer(object):
 		Returns:
 			An op for gradient computation.
 		"""
-		with tf.device(_gpu_device_name(self.worker_id)):
+		with tf.device(_gpu_device_name(self.replica_id)):
 			op = [	tf.assign(v, v - self.learning_rate*g) 
 					for g, v in grads_and_vars]
 
@@ -75,13 +76,13 @@ class Optimizer(object):
 
 class NormalNoiseGDOptimizer(Optimizer):
 
-	def __init__(self, learning_rate, worker_id, noise_list):
-		super(NormalNoiseGDOptimizer, self).__init__(learning_rate, worker_id, 
+	def __init__(self, learning_rate, replica_id, noise_list):
+		super(NormalNoiseGDOptimizer, self).__init__(learning_rate, replica_id, 
 			noise_list)
 		self.noise_list = noise_list
 		self.n_routes = len(noise_list)
 		self.train_route_dict = {}
-		self.current_route = worker_id
+		self.current_route = replica_id
 
 	def minimize(self, loss):
 		grads_and_vars = self.compute_gradients(loss)
@@ -104,7 +105,7 @@ class NormalNoiseGDOptimizer(Optimizer):
 			An op for gradient computation.
 		"""
 
-		with tf.device(_gpu_device_name(self.worker_id)):
+		with tf.device(_gpu_device_name(self.replica_id)):
 			op = [	tf.assign(v, v - self.learning_rate*g + tf.random_normal(v.shape, stddev=stddev)) 
 					for g, v in grads_and_vars]
 			train_op = tf.group(op)
@@ -118,11 +119,25 @@ class NormalNoiseGDOptimizer(Optimizer):
 			raise ValueError('train_op is not set. Call minimize() to set.')
 		return self.train_route_dict[self.current_route]
 
+class GDLDOptimizer(NormalNoiseGDOptimizer):
+	"""Gradient Descent Langevin Dynamics Optimizer"""
+	def __init__(self, learning_rate, replica_id, noise_list):
+		super(GDLDOptimizer, self).__init__(learning_rate, replica_id, noise_list)
+	
+	def apply_gradients(self, grads_and_vars, beta):
+		with tf.device(_gpu_device_name(self.replica_id)):
+
+			c = tf.sqrt(np.float32(2*self.learning_rate*beta))
+			op = [tf.assign(v, 
+				v-self.learning_rate*g + c*tf.random_normal(v.shape, stddev=1.0) )
+				for g, v in grads_and_vars]
+		return tf.group(op)
+
 class GDOptimizer(Optimizer):
 
-	def __init__(self, learning_rate, worker_id, noise_list=None):
+	def __init__(self, learning_rate, replica_id, noise_list=None):
 		super(GDOptimizer, self).__init__(	learning_rate, 
-											worker_id)
+											replica_id)
 
 
 
