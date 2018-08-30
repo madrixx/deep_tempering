@@ -48,8 +48,8 @@ class GraphBuilder(object):
 
 				# _noise_plcholders will be used to store noise vals for summaries
 				with self._graph.as_default():
-					self._noise_plcholders = {i:tf.placeholder_with_default(0.0, shape=[])
-						for i in range(self._n_replicas - 1)}
+					self._noise_plcholders = {i:tf.placeholder(tf.float32, shape=[])
+						for i in range(self._n_replicas)}
 
 				# curr_noise_dict stores {replica_id:current noise stddev VALUE}  
 				self._curr_noise_dict = {i:n for i, n in enumerate(self._noise_list)}
@@ -80,14 +80,14 @@ class GraphBuilder(object):
 		self.__DEBUG__logits_list = logits_list
 		self.__DEBUG__routes = [] # remove this !
 		self._cross_entropy_loss_dict = {}
-		#self._zero_one_loss = {}
 		self._zero_one_loss_dict = {}
 		self._optimizer_dict = {}
 		
+		# special vals for summary:
 		self.swap_accept_ratio = 1.0
 		self.n_swap_attempts = 0
 		self.latest_accept_proba = 1.0
-		self.swaps_dict = {i:0.0 for i in range(self._n_replicas - 1)} # store 
+		self.latest_swapped_pair = 0   
 		
 		with self._graph.as_default():
 			for i in range(self._n_replicas):
@@ -120,7 +120,7 @@ class GraphBuilder(object):
 			
 			self._summary = Summary(self._graph, self._n_replicas, self._name, 
 				self._cross_entropy_loss_dict, self._zero_one_loss_dict, self._noise_list, 
-				self.swaps_dict, self._noise_plcholders, summary_type=self._summary_type)
+				self._noise_plcholders, summary_type=self._summary_type)
 
 			self.variable_initializer = tf.global_variables_initializer()
 
@@ -156,7 +156,8 @@ class GraphBuilder(object):
 				for i in range(self._n_replicas)}
 			d.update({
 				self._summary.swap_accept_ratio_plcholder:self.swap_accept_ratio,
-				self._summary.accept_proba_plcholder:self.latest_accept_proba})
+				self._summary.accept_proba_plcholder:self.latest_accept_proba,
+				self._summary.swap_replica_pair_plcholder:self.latest_swapped_pair})
 			
 		elif dataset_type == 'train':
 			d = {self._noise_plcholders[i]:self._curr_noise_dict[i]
@@ -192,7 +193,7 @@ class GraphBuilder(object):
 		elif dataset_type == 'train':
 			train_op = [self._optimizer_dict[i].get_train_op() 
 				for i in range(self._n_replicas)]
-			if __DEBUG__: train_op = train_op + self.__DEBUG__logits_list
+			#if __DEBUG__: train_op = train_op + self.__DEBUG__logits_list
 			return loss + zero_one_loss + summary + train_op
 		else:
 			raise InvalidDatasetTypeError()
@@ -246,25 +247,26 @@ class GraphBuilder(object):
 		"""Swaps between replicas.
 
 		Swaps according to:
-			1. Uniformly randomly selects a pair of adjacent temperatures
+			1. Uniformly randomly select a pair of adjacent temperatures
 				1/beta_i and 1/beta_i+1, for which swap move is proposed.
-			2. Computes the acceptance ratio for the proposed swap and 
-				accepts the swap with probability:
-
-					min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)}
+			2. Compute the acceptance ratio for the proposed swap and 
+			accept the swap with probability:
+				min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)}
 		
-
 		"""
 		self.n_swap_attempts += 1
-		beta = self._noise_list
-		loss_list = self.extract_evaluated_tensors(evaluated, 'zero_one_loss')
-		i = random.choice(range(self._n_replicas - 1))
+		#beta = self._noise_list
+		beta = [self._curr_noise_dict[i] for i in range(self._n_replicas)]
+		loss_list = self.extract_evaluated_tensors(evaluated, 'cross_entropy')
+		i = random.choice(range(self._n_replicas - 1)) # pair number
 
 		l1, l2 = loss_list[i], loss_list[i+1]
-	
+		l1 = l1/beta[i]
+		l2 = l2/beta[i+1]
 		accept_proba = np.exp((l1-l2)*(beta[i] - beta[i+1]))
-		#print(accept_proba)
 		self.latest_accept_proba = accept_proba
+		#print('\n','l1 - l2=', l1 - l2, ',', 'beta[i]-beta[i+1]', beta[i]-beta[i+1], 'res=', (l1-l2)*(beta[i] - beta[i+1]))
+
 		if np.random.uniform() < accept_proba:
 			self._curr_noise_dict[i] = self._noise_list[i+1]
 			self._curr_noise_dict[i+1] = self._noise_list[i]
@@ -274,9 +276,11 @@ class GraphBuilder(object):
 
 			self.swap_accept_ratio = (((self.n_swap_attempts - 1)/self.n_swap_attempts)*self.swap_accept_ratio 
 				+ (1/self.n_swap_attempts))
+			self.latest_swapped_pair = i
 		else:
+			self.latest_swapped_pair = -1
 			self.swap_accept_ratio = (((self.n_swap_attempts - 1)/self.n_swap_attempts)*self.swap_accept_ratio)
-		self.__DEBUG__routes.append((i, i+1))
+		#self.__DEBUG__routes.append((i, i+1))
 
 	def get_tf_graph(self): return self._graph
 		
