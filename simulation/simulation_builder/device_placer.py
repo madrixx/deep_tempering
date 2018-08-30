@@ -4,7 +4,7 @@ from tensorflow.python.client import device_lib
 
 from simulation.simulator_exceptions import NoGpusFoundError
 
-RAISE_IF_NO_GPU = False
+RAISE_IF_NO_GPU = True
 
 def _get_available_gpus():
 	local_device_protos = device_lib.list_local_devices()

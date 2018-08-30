@@ -13,7 +13,8 @@ class Simulator(object):
 
 	def __init__(self, architecture, learning_rate, noise_list, noise_type, 
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
-		test_step=200, swap_attept_step=500, description=None):
+		test_step=200, swap_attempt_step=500, temp_factor=None, 
+		tuning_parameter_name=None, description=None):
 		"""
 		self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
 			name, noise_type, summary_type)
@@ -30,7 +31,9 @@ class Simulator(object):
 		self.batch_size = batch_size
 		self.n_epochs = n_epochs
 		self.test_step = test_step
-		self.swap_attept_step = swap_attept_step
+		self.swap_attempt_step = swap_attempt_step
+		self.temp_factor = temp_factor
+		self.tuning_parameter_name = tuning_parameter_name
 		tf.logging.set_verbosity(tf.logging.ERROR)
 		self.delim = "\\" if 'win' in sys.platform else "/"
 		self._dir = Dir(name)
@@ -41,7 +44,7 @@ class Simulator(object):
 	def train_n_times(self, train_func, *args, **kwargs):
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
-				self.noise_list, self.name + '_s_' + str(i), self.noise_type, self.summary_type)
+				self.noise_list, self.name, self.noise_type, self.summary_type, simulation_num=i)
 			train_func(kwargs)
 			gc.collect()
 	
@@ -108,10 +111,10 @@ class Simulator(object):
 								buff = buff + ','.join([str(l) for l in loss]) + ', '
 								buff = buff + 'accept_ratio:' + str(g.swap_accept_ratio)
 								buff = buff + ', proba:' + str(g.latest_accept_proba) + ', '
-								buff = buff + str(g.latest_swapped_pair)
+								buff = buff + str(g.latest_swapped_pair) + '               	'
 								self.stdout_write(buff)
 
-							if step % self.swap_attept_step == 0:
+							if step % self.swap_attempt_step == 0:
 								# validation
 								valid_feed_dict = g.create_feed_dict(
 									valid_data, valid_labels, 'validation')
@@ -216,7 +219,7 @@ class Simulator(object):
 	
 	def _log_params(self, desciption):
 		dirpath = self._dir.log_dir
-		filepath = os.path.join(dirpath, 'desciption.json')
+		filepath = os.path.join(dirpath, 'description.json')
 		if not os.path.exists(dirpath):
 			os.makedirs(dirpath)
 		_log = {
@@ -226,7 +229,10 @@ class Simulator(object):
 			'learning_rate':self.learning_rate,
 			'n_epochs':self.n_epochs,
 			'batch_size':self.batch_size,
-			'swap_attept_step': self.swap_attept_step,
+			'swap_attempt_step': self.swap_attempt_step,
+			'temp_factor': self.temp_factor,
+			'n_simulations': self.n_simulations,
+			'tuning_parameter_name':self.tuning_parameter_name,	
 			'description':desciption
 
 		}

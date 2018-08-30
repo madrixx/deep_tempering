@@ -10,7 +10,7 @@ def sort_py_func(a):
 
 class Summary(object):
 	def __init__(self, graph, n_replicas, name, loss_dict, zero_one_loss_dict, noise_list, 
-		noise_plcholders, summary_type=None):
+		noise_plcholders, simulation_num, summary_type=None):
 
 		self.graph = graph
 		self.n_replicas = n_replicas
@@ -23,11 +23,16 @@ class Summary(object):
 		self.accept_proba_plcholder = tf.placeholder(tf.float32, shape=[])
 		self.swap_replica_pair_plcholder = tf.placeholder(tf.int8, shape=[])
 		self.swap_ordered_pair_plcholder = tf.placeholder(tf.int8, shape=[])
+
+		self.replica_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) for i in range(self.n_replicas)}
+		self.ordered_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) for i in range(self.n_replicas)}
+
 		self.pairs_swap_dict = {i:tf.placeholder(tf.float32, shape=[])
 			for i in range(n_replicas - 1)}
 		self.summary_type = summary_type
+		#self.simulation_num=simulation_num
 		
-		self.dir = Dir(self.name)
+		self.dir = Dir(self.name, simulation_num=simulation_num)
 		self.dir.clean_dirs()
 		
 		self.writer_dict = {
@@ -69,6 +74,15 @@ class Summary(object):
 			tf.summary.scalar('swapped_replica_pair', 
 				self.swap_replica_pair_plcholder,
 				collections=['special'])
+
+			for i in range(self.n_replicas):
+				tf.summary.scalar('accept_ratio_replica_' + str(i),
+					self.replica_accept_ratio_plcholders[i],
+					collections=['special'])
+				tf.summary.scalar('accept_ratio_ordered_' + str(i),
+					self.ordered_accept_ratio_plcholders[i],
+					collections=['special'])
+
 			"""
 			tf.summary.scalar('swapped_ordered_pair',
 				self.swap_ordered_pair_plcholder,
@@ -250,13 +264,16 @@ class Summary(object):
 class Dir(object):
 	"""Helper class for generating directory names."""
 
-	def __init__(self, name):
+	def __init__(self, name, simulation_num=''):
 		
 		self.name = name
 		self.delim = "\\" if "win" in sys.platform else "/"
 		log_dir = os.path.abspath(
 			self.delim.join(__file__.split(self.delim)[:-2]))
 		self.log_dir = os.path.join(log_dir, 'summaries', name) 
+		if (simulation_num is not None and
+			simulation_num != ''):
+			self.log_dir = os.path.join(self.log_dir, simulation_num)
 		
 	
 	def get_special_dir(self):
