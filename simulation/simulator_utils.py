@@ -6,6 +6,8 @@ from tensorboard.backend.event_processing import event_accumulator
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import pickle
+import pandas as pd
 
 from simulation.simulation_builder.summary import Dir
 
@@ -19,23 +21,37 @@ class MultiExperimentSummaryExtractor(object):
 		self.summary_extractors = {e:SummaryExtractor(e)
 			for e in experiments}
 		
-	def plot(self, keys, match=None):
+	def plot(self, keys, match=None, param_min=None, param_max=None, mark_lines=None):
 		param_names_list = []
 		fig, ax = plt.subplots()
 		keys = keys + ['mean']
+		completed_labels = []
 		for k in self.summary_extractors:
 			extractor = self.summary_extractors[k]
 			for s in extractor.list_available_summaries():
 				summ_name = s.split('/') if match == 'exact' else s
 				if all(x in summ_name for x in keys):
 					x, y = extractor.get_summary(s)
-					with open(os.path.join(extractor._dir.log_dir, 'description.json')) as fo:
-						js = json.load(fo)
-						param_name = js['tuning_parameter_name']
-						param_names_list.append(param_name)
-						param_val = "{:10.2f}".format(float(js[param_name]))
-						#"{:10.4f}".format(x) 
-					ax.plot(x, y, label=k.split('_')[-1] + '_' + param_val +'/'+s)
+					
+					js = extractor.get_description()
+					param_name = js['tuning_parameter_name']
+					param_names_list.append(param_name)
+					param_val = "{:10.2f}".format(float(js[param_name]))
+					if param_min and param_min > float(param_val):
+						continue
+					if param_max and param_max < float(param_val):
+						continue
+					#"{:10.4f}".format(x) 
+					label = k.split('_')[-1] + '_' + param_val +'/'+s
+					
+					if label in completed_labels:
+						continue
+					completed_labels.append(label)
+					if mark_lines and float(param_val) in mark_lines:
+
+						ax.plot(x, y, label=label, linewidth=3.5)
+					else:	
+						ax.plot(x, y, label=label)
 
 		box = ax.get_position()
 		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
@@ -44,6 +60,9 @@ class MultiExperimentSummaryExtractor(object):
 		ax.title.set_text('Tuning parameter: ' + ', '.join(list(set(param_names_list))))
 
 		return fig
+
+	def create_df(self):
+		return 1
 
 
 class SummaryExtractor(object):
@@ -59,11 +78,13 @@ class SummaryExtractor(object):
 			try:
 				#print(self._dir.log_dir + self._dir.delim + str(i))
 				self.all_summs_dict.update(extract_summary(
-					self._dir.log_dir + self._dir.delim + str(i)))
-			except: 
-				#print(i, 'simulations')
+					self._dir.log_dir + self._dir.delim + str(i)), delim=self._dir.delim)
+			except FileNotFoundError: 
+				self.all_summs_dict.pop('delim', None)
+				print(i, 'simulations')
 				self.n_experiments = i
 				self._create_experiment_averages()
+
 				break
 
 	def get_summary(self, summ_name, split=True):
@@ -105,8 +126,9 @@ class SummaryExtractor(object):
 			bbox_to_anchor=(1.6, 0.5))
 
 		if add_swap_marks:
-			with open(os.path.join(self._dir.log_dir, 'description.json')) as fo:
-				js = json.load(fo)
+			#with open(os.path.join(self._dir.log_dir, 'description.json')) as fo:
+				#js = json.load(fo)
+			js = self.get_description()
 			step = js['swap_attempt_step']
 			s = self.list_available_summaries()[0]
 			x, y = self.get_summary(s)
@@ -116,15 +138,19 @@ class SummaryExtractor(object):
 		return fig
 
 	def get_description(self):
-		with open(os.path.join(self._dir.log_dir, 'description.json')) as fo:
+		with open(os.path.join(self._dir.log_dir.replace('summaries/', 'summaries/compressed/'), 'description.json')) as fo:
 			js = json.load(fo)
 
 		return js
-		
+
 	def _create_experiment_averages(self):
 		all_keys = self.list_available_summaries()
-		all_keys.sort(key=lambda x: x.split('/')[1] + x.split('/')[-1])
-
+		#.pop('delim', None) # dont know why this key is in dict 
+		try:
+			all_keys.sort(key=lambda x: x.split('/')[1] + x.split('/')[-1])
+		except IndexError:
+			
+			raise
 		completed_keys = []
 
 		for k in all_keys:
@@ -151,7 +177,7 @@ def extract_summary2(log_dir):
 
 	return res
 """
-def extract_summary(log_dir, delim="\\"):
+def extract_summary(log_dir, delim="/"):
 	"""
 	Extracts summaries from simulation `name`
 
@@ -162,26 +188,70 @@ def extract_summary(log_dir, delim="\\"):
 	Returns:
 		A dict where keys are names of the summary scalars and
 		vals are numpy arrays of tuples (step, value)
-	""" 
-	sim_num = log_dir.split(delim)[-1]
-	res = {}
-	for file in os.listdir(log_dir):
-		fullpath = os.path.join(log_dir, file)
 
-		if os.path.isdir(fullpath):
+	"""	
+
+	
+	
+	
+
+	compressed_dir = log_dir.replace('summaries/', 'summaries/compressed/')
+	summary_filename = os.path.join(compressed_dir, 'summary.pickle') 
+	#print(delim.join(log_dir.split(delim)[:-1]))
+	#print(delim.join(compressed_dir.split(delim)))
+	src_description_file = os.path.join(delim.join(log_dir.split(delim)[:-1]), 'description.json')
+	dst_description_file = os.path.join(delim.join(compressed_dir.split(delim)[:-1]), 'description.json')
+
+	#print(src_description_file)
+	#	print(dst_description_file)
+	if not os.path.exists(compressed_dir):
 		
-			for _file in os.listdir(fullpath):
-				
-				filename = os.path.join(fullpath, _file)
-				
-				ea = event_accumulator.EventAccumulator(filename)
-				ea.Reload()
-				for k in ea.scalars.Keys():
-					lc = np.stack(
-						[np.asarray([scalar.step, scalar.value])
-						for scalar in ea.Scalars(k)])
-					key_name = sim_num + '/' + file + '/' +  k.split('/')[-1]
-					key_name = '/'.join(key_name.split('/')[-3:])
-					res[key_name] = lc
+		os.makedirs(compressed_dir)
 		
+		with open(src_description_file) as fo:
+			js = json.load(fo)
+		
+		with open(dst_description_file, 'w') as fo:
+			json.dump(js, fo, indent=4)
+
+	if os.path.exists(summary_filename):
+
+		with open(summary_filename, 'rb') as fo:
+			res = pickle.load(fo)
+			#print('uncompressed', summary_filename)
+			return res
+	else:
+
+
+		sim_num = log_dir.split(delim)[-1]
+		res = {}
+		for file in os.listdir(log_dir):
+			fullpath = os.path.join(log_dir, file)
+
+			if os.path.isdir(fullpath):
+			
+				for _file in os.listdir(fullpath):
+					
+					filename = os.path.join(fullpath, _file)
+					
+					ea = event_accumulator.EventAccumulator(filename)
+					ea.Reload()
+					for k in ea.scalars.Keys():
+						lc = np.stack(
+							[np.asarray([scalar.step, scalar.value])
+							for scalar in ea.Scalars(k)])
+						key_name = sim_num + '/' + file + '/' +  k.split('/')[-1]
+						key_name = '/'.join(key_name.split('/')[-3:])
+						res[key_name] = lc
+		
+		with open(summary_filename, 'wb') as fo:
+			pickle.dump(res, fo)
+	
+	
 	return res
+
+def extract_and_remove_simulation(path):
+	se = SummaryExtractor(path)
+	se._dir.clean_dirs()
+
+

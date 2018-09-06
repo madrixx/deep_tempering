@@ -72,7 +72,7 @@ class GraphBuilder(object):
 					for i, n in enumerate(sorted(self._noise_list, reverse=True))}
 
 			else: 
-				raise InvalidArchitectureFuncError(len(res), self.noise_type)
+				raise InvalidArchitectureFuncError(len(res), self._noise_type)
 
 		except:
 			raise

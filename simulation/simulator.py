@@ -8,6 +8,7 @@ import sys
 
 from simulation.simulation_builder.graph_builder import GraphBuilder
 from simulation.simulation_builder.summary import Dir
+from simulation import simulator_utils as s_utils
 
 class Simulator(object):
 
@@ -42,11 +43,20 @@ class Simulator(object):
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
+		sim_names = []
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, self.summary_type, simulation_num=i)
+			#print(self.graph._summary.dir.log_dir)
+			#print(self.graph._summary.dir.name)
+			#sys.exit()
+			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
+
+			#self.graph._summary.dir.clean_dirs()
 			gc.collect()
+		
+		[s_utils.extract_and_remove_simulation(n) for n in sim_names	]
 	
 	def train_PTLD(self, kwargs):
 	
