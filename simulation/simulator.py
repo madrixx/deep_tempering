@@ -16,10 +16,11 @@ class Simulator(object):
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
 		test_step=200, swap_attempt_step=500, temp_factor=None, 
 		tuning_parameter_name=None, description=None):
-		"""
-		self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
-			name, noise_type, summary_type)
-		"""
+		
+		if n_simulations == 1:
+			self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
+				name, noise_type, summary_type)
+		
 		self.architecture = architecture
 		self.learning_rate = learning_rate
 		self.noise_type = noise_type
@@ -43,20 +44,18 @@ class Simulator(object):
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
+		"""Trains `n_simulations` times using the same setup."""
 		sim_names = []
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, self.summary_type, simulation_num=i)
-			#print(self.graph._summary.dir.log_dir)
-			#print(self.graph._summary.dir.name)
-			#sys.exit()
+			
 			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
 
-			#self.graph._summary.dir.clean_dirs()
 			gc.collect()
 		
-		[s_utils.extract_and_remove_simulation(n) for n in sim_names	]
+		[s_utils.extract_and_remove_simulation(n) for n in sim_names]
 	
 	def train_PTLD(self, kwargs):
 	
@@ -103,7 +102,7 @@ class Simulator(object):
 						try:
 							step += 1
 
-							# train
+							### train ###
 							batch = sess.run(next_batch)
 							feed_dict = g.create_feed_dict(batch['X'], batch['y'])
 							evaluated = sess.run(g.get_train_ops(), 
@@ -111,21 +110,18 @@ class Simulator(object):
 							if step % 100 == 0:
 								g.add_summary(evaluated, step=step)
 
-							# test
+							### test ###
 							if step % self.test_step == 0:
 								evaluated = sess.run(g.get_train_ops('test'),
 									feed_dict=test_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='test')
 								loss = g.extract_evaluated_tensors(evaluated, 'cross_entropy')
-								buff = 'epoch:' + str(epoch) + ', step:' + str(step) + ', '
-								buff = buff + ','.join([str(l) for l in loss]) + ', '
-								buff = buff + 'accept_ratio:' + str(g.swap_accept_ratio)
-								buff = buff + ', proba:' + str(g.latest_accept_proba) + ', '
-								buff = buff + str(g.latest_swapped_pair) + '               	'
-								self.stdout_write(buff)
-
+								
+								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba)
+								
+							### validation ###
 							if step % self.swap_attempt_step == 0:
-								# validation
+								
 								valid_feed_dict = g.create_feed_dict(
 									valid_data, valid_labels, 'validation')
 								evaluated = sess.run(g.get_train_ops('validation'),
@@ -134,7 +130,7 @@ class Simulator(object):
 								g.swap_replicas(evaluated)
 
 								g._summary.flush_summary_writer()
-								#g._summary.close_summary_writer()
+						
 						except tf.errors.OutOfRangeError:
 							sess.run(iterator.initializer)
 							break
@@ -249,11 +245,19 @@ class Simulator(object):
 		with open(filepath, 'w') as fo:
 			json.dump(_log, fo, indent=4)
 
+	def print_log(self, loss, epoch, swap_accept_ratio, latest_accept_proba):
+		buff = 'epoch:' + str(epoch) + ', step:' + str(step) + ', '
+		buff = buff + ','.join([str(l) for l in loss]) + ', '
+		buff = buff + 'accept_ratio:' + str(swap_accept_ratio)
+		buff = buff + ', proba:' + str(latest_accept_proba) + '         '
+		self.stdout_write(buff)
+		
 	def stdout_write(self, buff):
 		sys.stdout.write('\r' + buff)
 		sys.stdout.flush()
 
 	def chunks(self, l):
+		# TODO: remove eventually
 		"""Yield successive batch-sized chunks from l."""
 		for i in range(0, len(l), self.batch_size):
 			yield l[i:i + n]

@@ -129,7 +129,7 @@ class GDLDOptimizer(NormalNoiseGDOptimizer):
 
 			c = tf.sqrt(np.float32(2*self.learning_rate/beta))
 			op = [tf.assign(v, 
-				v-self.learning_rate*g + c*tf.random_normal(v.shape, stddev=1) )
+				v - self.learning_rate*g + c*tf.random_normal(v.shape, stddev=1) )
 				for g, v in grads_and_vars]
 		return tf.group(op)
 

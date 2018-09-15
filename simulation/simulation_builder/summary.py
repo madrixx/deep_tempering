@@ -24,13 +24,14 @@ class Summary(object):
 		self.swap_replica_pair_plcholder = tf.placeholder(tf.int8, shape=[])
 		self.swap_ordered_pair_plcholder = tf.placeholder(tf.int8, shape=[])
 
-		self.replica_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) for i in range(self.n_replicas)}
-		self.ordered_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) for i in range(self.n_replicas)}
+		self.replica_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) 
+			for i in range(self.n_replicas)}
+		self.ordered_accept_ratio_plcholders = {i:tf.placeholder(tf.float32, shape=[]) 
+			for i in range(self.n_replicas)}
 
 		self.pairs_swap_dict = {i:tf.placeholder(tf.float32, shape=[])
 			for i in range(n_replicas - 1)}
 		self.summary_type = summary_type
-		#self.simulation_num=simulation_num
 		
 		self.dir = Dir(self.name, simulation_num=simulation_num)
 		self.dir.clean_dirs()
@@ -44,6 +45,7 @@ class Summary(object):
 			'valid_replica':{},
 		}
 		self.special_writer = None
+
 		self.summ_replica = {}
 		self.summ_ordered = {}
 		self.train_summ_replica = {}
@@ -52,7 +54,7 @@ class Summary(object):
 		self.test_summ_ordered = {}
 		self.valid_summ_replica = {}
 		self.valid_summ_ordered = {}
-		self.special_summ = None # returned together with validation
+		self.special_summ = None # used only together with validation
 
 		if (summary_type is None
 			or summary_type == 'replica_summary'):
@@ -65,6 +67,8 @@ class Summary(object):
 
 
 	def create_special_summary(self):
+		"""Special summary is everything except cross_validation, 
+			zero_one_loss and noise."""
 		with tf.name_scope('special_summary'):
 			tf.summary.scalar('accept_ratio', self.swap_accept_ratio_plcholder,
 				collections=['special'])
@@ -83,11 +87,6 @@ class Summary(object):
 					self.ordered_accept_ratio_plcholders[i],
 					collections=['special'])
 
-			"""
-			tf.summary.scalar('swapped_ordered_pair',
-				self.swap_ordered_pair_plcholder,
-				collections=['special'])
-			"""
 			self.special_writer = tf.summary.FileWriter(
 				logdir=self.dir.get_special_dir(),
 				graph=self.graph)
@@ -105,14 +104,13 @@ class Summary(object):
 
 				tf.summary.scalar('cross_entropy', self.loss_dict[i], 
 					collections=train_collect+test_collect+valid_collect)
+				
 				tf.summary.scalar('zero_one_loss', self.zero_one_loss_dict[i], 
 					collections=train_collect+test_collect+valid_collect)
 				
 				tf.summary.scalar('noise', self.noise_plcholders[i],
 					collections=train_collect)
 				
-				
-
 				self.train_summ_replica[i] = tf.summary.merge_all(train_collect[0])
 				self.test_summ_replica[i] = tf.summary.merge_all(test_collect[0])
 				self.valid_summ_replica[i] = tf.summary.merge_all(valid_collect[0])
@@ -173,6 +171,21 @@ class Summary(object):
 				filename_suffix=self.dir.get_filename_suffix())
 
 	def get_summary_ops(self, dataset_type):
+		"""Returns summary ops.
+
+		For train, test and validation tensor evaluation different
+		summary variables are stored. Hence, `dataset_type` must
+		be specified.
+
+		Args:
+			dataset_type: One of `train`, `test`, `validation`.
+
+		Raises:
+			InvalidDatasetTypeError if `dataset_type` is incorrect.
+
+		Returns:
+			Summary ops 
+		"""
 		summs = []
 		N = self.n_replicas
 		
@@ -206,6 +219,14 @@ class Summary(object):
 		return summs
 
 	def add_summary(self, evaluated_summ, step, dataset_type):
+		"""Adds evaluated summary to summary writer.
+
+		Args:
+			evaluated_summ: A list of evaluated summary (by sess.run()).
+			step: An int for second argument of tf.Summary.add_summary()
+			dataset_type: One of `train`, `test`, `validation`.
+
+		"""
 		if (self.summary_type is None
 			or self.summary_type == 'replica_summary'):
 			
@@ -225,6 +246,25 @@ class Summary(object):
 			self.special_writer.add_summary(evaluated_summ[-1], step)
 
 	def get_summary_writer(self, dataset_type, summary_type):
+		"""Returns summary writer.
+
+		Args:
+			dataset_type: One of `train`, `test`, `validation`.
+			summary_type: One of `replica_summary`, `ordered_summary`.
+				`replica_summary` is the summary that stores metrics 
+				for each one of the replicas. `ordered_summary` is the
+				summary that stores metrics for each replica but in 
+				sorted form (best loss is 0, second best is 1 etc.)
+		
+		Raises:
+			InvalidDatasetTypeError if `dataset_type` is incorrect. 
+			ValueError if `summary_type` is incorrect.
+
+		Returns:
+			Summary writer
+
+		"""
+
 		if summary_type == 'replica_summary':
 			if dataset_type == 'train':
 				return self.writer_dict['train_replica']
