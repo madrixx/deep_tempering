@@ -189,7 +189,7 @@ class SummaryExtractor(object):
 					self._dir.log_dir + self._dir.delim + str(i)), delim=self._dir.delim)
 			except FileNotFoundError: 
 				self.all_summs_dict.pop('delim', None)
-				print(i, 'simulations')
+				#print(i, 'simulations')
 				self.n_experiments = i
 				self._create_experiment_averages()
 
