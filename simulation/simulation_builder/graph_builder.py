@@ -13,6 +13,7 @@ from simulation.simulation_builder.graph_duplicator import copy_and_duplicate
 from simulation.simulation_builder.optimizers import GDOptimizer
 from simulation.simulation_builder.optimizers import NormalNoiseGDOptimizer
 from simulation.simulation_builder.optimizers import GDLDOptimizer
+from simulation.simulation_builder.optimizers import LDSampler
 from simulation.simulation_builder.summary import Summary
 from simulation.simulator_exceptions import InvalidDatasetTypeError
 from simulation.simulator_exceptions import InvalidArchitectureFuncError
@@ -32,7 +33,7 @@ class GraphBuilder(object):
 		self._name = name
 		self._graph = tf.Graph()
 		self._noise_list = (sorted(noise_list) 
-			if noise_type == 'random_normal' or noise_type == 'betas'
+			if noise_type == 'random_normal' or noise_type == 'betas' or 'LDSamper'
 			else sorted(noise_list, reverse=True))
 		self._summary_type = summary_type
 		self._simulation_num = '' if simulation_num is None else str(simulation_num)
@@ -42,7 +43,7 @@ class GraphBuilder(object):
 		try:
 			res = self._architecture(tf.Graph())
 			if (len(res) == 3 and 
-				(noise_type == 'random_normal' or noise_type == 'betas')):
+				(noise_type == 'random_normal' or noise_type == 'betas' or noise_type == 'LDSampler')):
 				X, y, logits = res
 				self.X, self.y, logits_list = copy_and_duplicate(X, y, logits, 
 					self._n_replicas, self._graph)
@@ -111,6 +112,8 @@ class GraphBuilder(object):
 						Optimizer = NormalNoiseGDOptimizer
 					elif noise_type == 'betas':
 						Optimizer = GDLDOptimizer
+					elif noise_type == 'LDSampler':
+						Optimizer = LDSampler
 					else:
 						Optimizer = GDOptimizer
 					"""	

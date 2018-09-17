@@ -133,6 +133,45 @@ class GDLDOptimizer(NormalNoiseGDOptimizer):
 				for g, v in grads_and_vars]
 		return tf.group(op)
 
+class LDSampler(NormalNoiseGDOptimizer):
+	"""Samples the trajectory without gradients by adding Langevin Noise"""
+	def __init__(self, learning_rate, replica_id, noise_list):
+		super(LDSampler, self).__init__(learning_rate, replica_id, noise_list)
+	"""
+	def apply_gradients(self, grads_and_vars, beta):
+		with tf.device(_gpu_device_name(self.replica_id)):
+
+			c = tf.sqrt(np.float32(2*self.learning_rate/beta))
+			op = [tf.assign(v, 
+				v - self.learning_rate*g + c*tf.random_normal(v.shape, stddev=1) )
+				for g, v in grads_and_vars]
+		return tf.group(op)
+	"""
+
+	def minimize(self, loss):
+		grads_and_vars = self.compute_gradients(loss)
+
+		train_op = self.apply_gradients(grads_and_vars)
+		self.train_op = train_op
+		return train_op
+
+	def compute_gradients(self, loss):
+		return [()]
+		#var_list = self._get_dependencies(loss)
+		#with tf.device(_gpu_device_name(self.replica_id)):
+		#	grads_and_vars = self.tf_optimizer.compute_gradients(loss, var_list)
+		#return grads_and_vars
+
+	def apply_gradients(self, grads_and_vars, beta)
+		with tf.device(_gpu_device_name(self.replica_id)):
+			var_list = self._get_dependencies(loss)
+			c = tf.sqrt(np.float32(2*self.learning_rate/beta))
+			op = [tf.assign(v, 
+				v + c*tf.random_normal(v.shape, stddev=1))
+				for v in var_list]
+		return tf.group(op)
+
+
 
 class GDOptimizer(Optimizer):
 
