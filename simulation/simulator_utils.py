@@ -21,6 +21,7 @@ class MultiExperimentSummaryExtractor(object):
 		experiments = list(set(experiments))
 		self.summary_extractors = {e:SummaryExtractor(e)
 			for e in experiments}
+		self.df = None
 
 	def get_summary_extractor(self, name, simulation_num):
 		try:
@@ -30,11 +31,15 @@ class MultiExperimentSummaryExtractor(object):
 			print('The max number of simulation is', sim_numbers[-1], ', but given', simulation_num)
 
 	def get_summary_extractor_by_experiment_num(self, experiment_num):
-		name = [n for n in self.summary_extractors if str(experiment_num) == n.split('_')[-1]][0]
-		return self.summary_extractors[name]
+		try:
+			name = [n for n in self.summary_extractors if str(experiment_num) == n.split('_')[-1]][0]
+		
+			return self.summary_extractors[name]
+		except:
+			return None
 
 	
-	def plot(self, keys, match=None, param_min=None, param_max=None, mark_lines=None):
+	def plot(self, keys, match=None, param_min=None, param_max=None, mark_lines=None, axis_color='royalblue'):
 		def sort_foo(x):
 			return int(x.split('_')[-1])
 		param_names_list = []
@@ -72,6 +77,12 @@ class MultiExperimentSummaryExtractor(object):
 		ax.legend(loc='center right', fancybox=True, shadow=True, 
 			bbox_to_anchor=(1.4, 0.5))
 		ax.title.set_text('Tuning parameter: ' + ', '.join(list(set(param_names_list))))
+		#ax.xaxis.label.set_color('red')
+		#ax.yaxis.label.set_color('red')
+		ax.tick_params(axis='x', colors='royalblue')
+		ax.tick_params(axis='y', colors='royalblue')
+		ax.spines['bottom'].set_color('royalblue')
+		ax.spines['left'].set_color('royalblue')
 
 		return fig
 
@@ -96,7 +107,16 @@ class MultiExperimentSummaryExtractor(object):
 				if 'mean' in summ_name:
 					continue
 				sim_num = int(summ_name.split('/')[0])
-				id_ = int(summ_name.split('_')[-1])
+				if 'accept' in variable_names:
+					id_ = int(summ_name.split('_')[-1])
+				else:
+
+					try:
+						id_ = int(re.split(r"/|_", summ_name)[-3])
+					except:
+						print(summ_name)
+						print(re.split(r"/|_", summ_name))
+						raise
 				if df is None:
 					cols = ['experiment', 'simulation', 'id', 'temp_factor']
 					values = se.get_summary(summ_name)
@@ -138,6 +158,47 @@ class MultiExperimentSummaryExtractor(object):
 			
 		return df
 		"""
+
+	def get_last_value_mean_std_report(self, df, experiment_num):
+		n_ids = int(df.id.max())
+
+		df_exp = df[df.experiment==experiment_num]
+
+		columns = df.columns.tolist()[4:]
+		_df = df_exp[columns]
+		res = {}
+
+		for id_ in range(n_ids):
+			d = _df[_df.id==id_]
+			vals = d[[columns[-1]]]
+			mean = vals.mean(axis=0)
+			stddev = vals.std(axis=0, ddof=1)
+			res = {
+				'mean':mean,
+				'stddev':stddev
+			}
+		return res
+
+	def get_best_value_mean_std_report(self, df, experiment_num):
+		n_ids = int(df.id.max())
+
+		df_exp = df[df.experiment==experiment_num]
+
+		columns = df.columns.tolist()[4:]
+		_df = df_exp[columns]
+		res = {}
+
+		for id_ in range(n_ids):
+			d = _df[_df.id==id_]
+			vals = d[d>.00000001].min(axis=1)
+			mean = vals.mean(axis=0)
+			stddev = vals.std(axis=0, ddof=1)
+			res = {
+				'mean':mean,
+				'stddev':stddev
+			}
+		return res
+
 	def get_accept_ratio_mean_std_report(self, df, experiment_num):
     
 		# ids == replicas or ordered replicas
@@ -155,6 +216,35 @@ class MultiExperimentSummaryExtractor(object):
 			res[id_] = {'mean':mean,
 			'stddev':stddev}
 		return res
+
+	def generate_accept_ratio_data_summarized(self):
+		
+		mean_of_means = []
+		stddev_of_means = []
+		temp_factors = []
+
+		df = self.create_df(['accept', 'ratio', 'replica'])
+
+		for i in range(100):
+			temp_factor = self.get_summary_extractor_by_experiment_num(i)
+			
+			if temp_factor is not None:
+				temp_factor = temp_factor.get_description()['temp_factor']
+			else:
+				break
+			temp_factors.append(temp_factor)
+			report = self.get_accept_ratio_mean_std_report(df, i)
+			mom = self.get_mean_of_means_from_report(report)
+			som = self.get_stddev_of_means_from_report(report)
+
+			mean_of_means.append(mom)
+			stddev_of_means.append(som)
+
+		return mean_of_means, stddev_of_means, temp_factors
+
+
+
+
 		
 	def get_mean_of_means_from_report(self, report):
 		means = [report[k]['mean'] for k in report]
