@@ -24,13 +24,15 @@ from simulation.simulator_utils import __DEBUG__
 class GraphBuilder(object):
 
 	def __init__(self, architecture, learning_rate, noise_list, name, 
-		noise_type='random_normal', summary_type=None, simulation_num=None):
+		noise_type='random_normal', summary_type=None, simulation_num=None, 
+		surface_view='information'):
 		
 		self._architecture = architecture
 		self._learning_rate = learning_rate
 		self._n_replicas = len(noise_list)
 		self._noise_type = noise_type
 		self._name = name
+		self._surface_view = surface_view
 		self._graph = tf.Graph()
 		self._noise_list = (sorted(noise_list) 
 			if noise_type == 'random_normal' or noise_type == 'betas' or 'LDSamper'
@@ -128,8 +130,8 @@ class GraphBuilder(object):
 			
 			self._summary = Summary(self._graph, self._n_replicas, self._name, 
 				self._cross_entropy_loss_dict, self._zero_one_loss_dict, self._noise_list, 
-				self._noise_plcholders, simulation_num=self._simulation_num, 
-				summary_type=self._summary_type)
+				self._noise_plcholders, simulation_num, 
+				self._optimizer_dict, summary_type=self._summary_type)
 
 			self.variable_initializer = tf.global_variables_initializer()
 
@@ -264,9 +266,11 @@ class GraphBuilder(object):
 		Swaps according to:
 			1. Uniformly randomly select a pair of adjacent temperatures
 				1/beta_i and 1/beta_i+1, for which swap move is proposed.
-			2. Compute the acceptance ratio for the proposed swap and 
-			accept the swap with probability:
+			2. Compute the acceptance ratio for the proposed swap. 
+			If surface_view is 'information', accept with probability:
 				min{1, exp((beta_i-beta_i+1)*(loss_i/beta_i-loss_i+1/beta_i+1)}
+			if surface_view is 'energy', accept with probability:
+				min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)} 
 		
 		"""
 		random_pair = random.choice(range(self._n_replicas - 1)) # pair number
@@ -294,8 +298,10 @@ class GraphBuilder(object):
 		self.ordered_n_swap_attempts[sorted_i] += 1
 		self.ordered_n_swap_attempts[sorted_j] += 1
 
-
-		l1, l2 = loss_list[i]/beta[i], loss_list[j]/beta[j]
+		if self._surface_view == 'information':
+			l1, l2 = loss_list[i]/beta[i], loss_list[j]/beta[j]
+		else:
+			l1, l2 = loss_list[i], loss_list[j] # energy
 		
 		accept_proba = np.exp((l1-l2)*(beta[i] - beta[j]))
 		self.latest_accept_proba = accept_proba
@@ -356,6 +362,10 @@ class GraphBuilder(object):
 				zero_one_loss = 1.0 - tf.reduce_mean(tf.cast(x=y_pred, dtype=tf.float32), 
 					name='zero_one_loss')
 		return zero_one_loss
+
+
+	
+
 
 	
 
