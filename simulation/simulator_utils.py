@@ -431,7 +431,8 @@ def extract_and_remove_simulation(path):
 
 def generate_experiment_name(architecture=None, dataset='mnist', 
 	tuning_param_name=None, optimizer='PTLD', swaps_type='dynamic', 
-	n_replicas=None, surface_view='energy', starting_beta=None, version='v2'):
+	n_replicas=None, surface_view='energy', starting_beta=None, loss_func='crossentropy', 
+	version='v2'):
 	
 	
 	"""Experiment name:
@@ -450,12 +451,14 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 		or (swaps_type is None or swaps_type not in ['dynamic', 'static'])
 		or (n_replicas is None)
 		or (surface_view is None or surface_view not in ['energy', 'info'])
-		or (starting_beta is None)):
+		or (starting_beta is None)
+		or (loss_func is None or loss_func not in ['crossentropy', 'zerooneloss'])):
 		raise InvalidExperimentValueError()
 
 	name = architecture + '_' + dataset + '_'
 	name = name + tuning_param_name + '_' + optimizer + '_'
 	name = name + swaps_type + '_' + str(n_replicas) + '_'
-	name = name + surface_view + '_' + str(starting_beta) + '_' + version
+	name = name + surface_view + '_' + str(starting_beta) + '_' 
+	name = name + loss_func + '_' + version
 
 	return name 
