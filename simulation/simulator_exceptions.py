@@ -55,6 +55,7 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "n_replicas: int or str \n"
 		msg = msg + "surface_view: 'energy' or 'info' \n"
 		msg = msg + "starting_beta: int or str \n"
+		msg = msg + "loss_func: 'crossentropy' or 'zerooneloss' \n"
 		self.msg = msg
 
 	def __str__(self):
