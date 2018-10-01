@@ -41,3 +41,22 @@ class InvalidLossFuncError(Exception):
 
 	def __str__(self):
 		return self.msg
+
+class InvalidExperimentValueError(Exception):
+	pass
+
+	def __init__(self, ):
+		msg = 'Invalid value of a parameter. Valid parameters are: \n'
+		msg = msg + "architecture: 'nn' or 'cnn' \n"
+		msg = msg + "dataset: 'mnist' or 'cifar' \n"
+		msg = msg + "tuning_param_name: 'swapstep' or 'tempfactor' \n"
+		msg = msg + "optimizer: 'PTLD' \n"
+		msg = msg + "swaps_type: static (no swaps) or dynamic (yes swaps)\n"
+		msg = msg + "n_replicas: int or str \n"
+		msg = msg + "surface_view: 'energy' or 'info' \n"
+		msg = msg + "starting_beta: int or str \n"
+		self.msg = msg
+
+	def __str__(self):
+		return self.msg
+
