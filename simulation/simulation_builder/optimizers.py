@@ -19,6 +19,7 @@ class Optimizer(object):
 		self.noise_list = noise_list
 		self.tf_optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
 		self.train_op = None
+		self.trainable_variables = None
 
 	def minimize(self, loss):
 		grads_and_vars = self.compute_gradients(loss)
@@ -71,6 +72,10 @@ class Optimizer(object):
 					if op_in.op not in visited:
 						queue.append(op_in.op)
 						visited.add(op_in.op)
+
+		# trainable vars for calculation of displacement from original vals
+		if self.trainable_variables is None:
+			self.trainable_variables = variables
 						
 		return variables 
 
@@ -116,11 +121,12 @@ class NormalNoiseGDOptimizer(Optimizer):
 
 	def get_train_op(self,):
 		if len(list(self.train_route_dict.keys())) == 0:
-			raise ValueError('train_op is not set. Call minimize() to set.')
+			raise ValueError('train_op is not set for Optimizer. Call minimize() to set.')
 		return self.train_route_dict[self.current_route]
 
 class GDLDOptimizer(NormalNoiseGDOptimizer):
 	"""Gradient Descent Langevin Dynamics Optimizer"""
+	
 	def __init__(self, learning_rate, replica_id, noise_list):
 		super(GDLDOptimizer, self).__init__(learning_rate, replica_id, noise_list)
 	
@@ -162,7 +168,7 @@ class LDSampler(NormalNoiseGDOptimizer):
 		#	grads_and_vars = self.tf_optimizer.compute_gradients(loss, var_list)
 		#return grads_and_vars
 
-	def apply_gradients(self, grads_and_vars, beta)
+	def apply_gradients(self, grads_and_vars, beta):
 		with tf.device(_gpu_device_name(self.replica_id)):
 			var_list = self._get_dependencies(loss)
 			c = tf.sqrt(np.float32(2*self.learning_rate/beta))

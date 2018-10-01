@@ -11,11 +11,30 @@ from simulation.simulation_builder.summary import Dir
 from simulation import simulator_utils as s_utils
 
 class Simulator(object):
+	"""
+	
+	Args:
+		architecture:
+		learning_rate:
+		noise_list:
+		noise_type:
+		batch_size:
+		n_epochs:
+		n_simulatins:
+		summary_type:
+		test_step:
+		swap_attempt_step:
+		temp_factor:
+		tuning_parameter_name:
+		surface_view: 'information' or 'energy'. See 
+			GraphBuilder.swap_replicas() for detailed explanation.
+		description: 
 
+	"""
 	def __init__(self, architecture, learning_rate, noise_list, noise_type, 
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
-		test_step=200, swap_attempt_step=500, temp_factor=None, 
-		tuning_parameter_name=None, description=None):
+		test_step=500, swap_attempt_step=500, temp_factor=None, 
+		tuning_parameter_name=None, surface_view='information', description=None):
 		
 		if n_simulations == 1:
 			self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
@@ -36,6 +55,7 @@ class Simulator(object):
 		self.swap_attempt_step = swap_attempt_step
 		self.temp_factor = temp_factor
 		self.tuning_parameter_name = tuning_parameter_name
+		self.surface_view = surface_view
 		tf.logging.set_verbosity(tf.logging.ERROR)
 		self.delim = "\\" if 'win' in sys.platform else "/"
 		self._dir = Dir(name)
@@ -48,7 +68,8 @@ class Simulator(object):
 		sim_names = []
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
-				self.noise_list, self.name, self.noise_type, self.summary_type, simulation_num=i)
+				self.noise_list, self.name, self.noise_type, 
+				self.summary_type, simulation_num=i, surface_view=self.surface_view)
 			
 			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
@@ -117,7 +138,88 @@ class Simulator(object):
 								g.add_summary(evaluated, step, dataset_type='test')
 								loss = g.extract_evaluated_tensors(evaluated, 'cross_entropy')
 								
-								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba)
+								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
+								
+							### validation ###
+							if step % self.swap_attempt_step == 0:
+								
+								valid_feed_dict = g.create_feed_dict(
+									valid_data, valid_labels, 'validation')
+								evaluated = sess.run(g.get_train_ops('validation'),
+									feed_dict=valid_feed_dict)
+								g.add_summary(evaluated, step, dataset_type='validation')
+								g.swap_replicas(evaluated)
+
+								g._summary.flush_summary_writer()
+						
+						except tf.errors.OutOfRangeError:
+							sess.run(iterator.initializer)
+							break
+
+				
+				g._summary.close_summary_writer()
+
+	def train(self, **kwargs):
+	
+		try:
+			g = self.graph
+			train_data = kwargs.get('train_data', None)
+			train_labels = kwargs.get('train_labels', None)
+			test_data = kwargs.get('test_data', None)
+			test_labels = kwargs.get('test_labels', None)
+			valid_data = kwargs.get('validation_data', None)
+			valid_labels = kwargs.get('validation_labels', None)
+			test_feed_dict = g.create_feed_dict(test_data, test_labels, 
+				dataset_type='test')
+			with g.get_tf_graph().as_default():
+				data = tf.data.Dataset.from_tensor_slices({
+					'X':train_data,
+					'y':train_labels
+					}).batch(self.batch_size)
+				iterator = data.make_initializable_iterator()
+		except:
+			raise
+
+		with g.get_tf_graph().as_default():
+
+			step = 0
+			
+			with tf.Session() as sess:
+				sess.run(iterator.initializer)
+				sess.run(g.variable_initializer)
+				next_batch = iterator.get_next()
+
+				# validation first time
+				valid_feed_dict = g.create_feed_dict(
+					valid_data, valid_labels, 'validation')
+				evaluated = sess.run(g.get_train_ops('validation'),
+					feed_dict=valid_feed_dict)
+				g.add_summary(evaluated, step, dataset_type='validation')
+				g.swap_replicas(evaluated)
+				g._summary.flush_summary_writer()
+				
+				for epoch in range(self.n_epochs):
+					
+					while True:
+						try:
+							step += 1
+
+							### train ###
+							batch = sess.run(next_batch)
+							feed_dict = g.create_feed_dict(batch['X'], batch['y'])
+							evaluated = sess.run(g.get_train_ops(), 
+								feed_dict=feed_dict)
+							if step % 100 == 0:
+								g.add_summary(evaluated, step=step)
+
+							### test ###
+							if step % self.test_step == 0:
+								evaluated = sess.run(g.get_train_ops('test'),
+									feed_dict=test_feed_dict)
+								g.add_summary(evaluated, step, dataset_type='test')
+								loss = g.extract_evaluated_tensors(evaluated, 'cross_entropy')
+								
+								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
 								
 							### validation ###
 							if step % self.swap_attempt_step == 0:
@@ -140,88 +242,6 @@ class Simulator(object):
 
 	
 
-	def train(self, *args, **kwargs):
-
-		def _prepare_data():
-			with g.get_tf_graph().as_default():
-				train_data = kwargs.get('train_data', None)
-				train_labels = kwargs.get('train_labels', None)
-				test_data = kwargs.get('test_data', None)
-				test_labels = kwargs.get('test_labels', None)
-				valid_data = kwargs.get('validation_data', None)
-				valid_labels = kwargs.get('validation_labels', None)
-
-				test_feed_dict = g.create_feed_dict(test_data, test_labels, 
-					dataset_type='test')
-				valid_feed_dict = g.create_feed_dict(valid_data, valid_labels,
-					dataset_type='validation')
-
-				data = tf.data.Dataset.from_tensor_slices({
-					'X':train_data,
-					'y':train_labels
-					}).batch(self.batch_size)
-				train_iter = data.make_initializable_iterator()
-
-			return test_feed_dict, valid_feed_dict, train_iter
-
-		try:
-			g = self.graph
-			test_feed_dict, valid_feed_dict, iterator = _prepare_data()
-
-		except:
-			raise
-		
-
-		with g.get_tf_graph().as_default():
-
-			step = 0
-			
-			with tf.Session() as sess:
-				sess.run(iterator.initializer)
-				sess.run(g.variable_initializer)
-				next_batch = iterator.get_next()
-
-				# validation first time
-				evaluated = sess.run(g.get_train_ops('validation'),
-					feed_dict=valid_feed_dict)
-				g.add_summary(evaluated, step, dataset_type='validation')
-				g.update_noise_vals(evaluated)
-
-				for epoch in range(self.n_epochs):
-					
-					while True:
-						try:
-							step += 1
-
-							# train
-							batch = sess.run(next_batch)
-							feed_dict = g.create_feed_dict(batch['X'], batch['y'])
-							evaluated = sess.run(g.get_train_ops(), 
-								feed_dict=feed_dict)
-							g.add_summary(evaluated, step=step)
-
-							# test
-							if step % self.test_step == 0:
-								evaluated = sess.run(g.get_train_ops('test'),
-									feed_dict=test_feed_dict)
-								g.add_summary(evaluated, step, dataset_type='test')
-								loss = g.extract_evaluated_tensors(evaluated, 'loss')
-								buff = 'epoch:' + str(epoch) + ', step:' + str(step) + ', '
-								buff = buff + ','.join([str(l) for l in loss])
-								self.stdout_write(buff)
-						except tf.errors.OutOfRangeError:
-							sess.run(iterator.initializer)
-							break
-
-					# validation
-					evaluated = sess.run(g.get_train_ops('validation'),
-						feed_dict=valid_feed_dict)
-					g.add_summary(evaluated, step, dataset_type='validation')
-					g.update_noise_vals(evaluated)
-					g._summary.flush_summary_writer()
-
-				g._summary.close_summary_writer()
-
 	
 	def _log_params(self, desciption):
 		dirpath = self._dir.log_dir
@@ -239,13 +259,14 @@ class Simulator(object):
 			'temp_factor': self.temp_factor,
 			'n_simulations': self.n_simulations,
 			'tuning_parameter_name':self.tuning_parameter_name,	
+			'surface_view':self.surface_view,
 			'description':desciption
 
 		}
 		with open(filepath, 'w') as fo:
 			json.dump(_log, fo, indent=4)
 
-	def print_log(self, loss, epoch, swap_accept_ratio, latest_accept_proba):
+	def print_log(self, loss, epoch, swap_accept_ratio, latest_accept_proba, step):
 		buff = 'epoch:' + str(epoch) + ', step:' + str(step) + ', '
 		buff = buff + ','.join([str(l) for l in loss]) + ', '
 		buff = buff + 'accept_ratio:' + str(swap_accept_ratio)

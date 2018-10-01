@@ -10,7 +10,7 @@ def sort_py_func(a):
 
 class Summary(object):
 	def __init__(self, graph, n_replicas, name, loss_dict, zero_one_loss_dict, noise_list, 
-		noise_plcholders, simulation_num, summary_type=None):
+		noise_plcholders, simulation_num, optimizer_dict, summary_type=None):
 
 		self.graph = graph
 		self.n_replicas = n_replicas
@@ -18,7 +18,8 @@ class Summary(object):
 		self.loss_dict = loss_dict
 		self.zero_one_loss_dict = zero_one_loss_dict
 		self.noise_list = noise_list
-		self.noise_plcholders = noise_plcholders 
+		self.noise_plcholders = noise_plcholders
+		self.optimizer_dict = optimizer_dict # diffusion summary 
 		self.swap_accept_ratio_plcholder = tf.placeholder(tf.float32, shape=[]) 
 		self.accept_proba_plcholder = tf.placeholder(tf.float32, shape=[])
 		self.swap_replica_pair_plcholder = tf.placeholder(tf.int8, shape=[])
@@ -62,9 +63,52 @@ class Summary(object):
 		if (summary_type is None 
 			or summary_type == 'ordered_summary'):
 			self.create_ordered_summary()
+		self.create_diffusion_vals() # MUST BE CALLED BEFORE special_summary
 		self.create_special_summary()
 		
+	def create_diffusion_vals(self):
+		""" Diffusion vals for summary.
+		
+		Stores the initial values of a trainable 
+		variables as a single vector to later calculation of a 
+		displacement of trainable variables relative to the initial 
+		values of those trainable parameters. 
+		"""
+		with tf.name_scope('Diffusion'):
+			opt = self.optimizer_dict
+			
+			curr_vars = {i:sorted(opt[i].trainable_variables, key=lambda x: x.name) 
+				for i in range(self.n_replicas)}
 
+			init_vars = {i:[tf.Variable(v.initialized_value()) for v in curr_vars[i]]
+				for i in range(self.n_replicas)}
+
+			#print(curr_vars[0])
+
+			curr_vars_reshaped = {i:[tf.reshape(v, [-1]) for v in curr_vars[i]]
+				for i in range(self.n_replicas)}
+
+
+			init_vars_reshaped = {i:[tf.reshape(v, [-1]) for v in init_vars[i]]
+				for i in range(self.n_replicas)}
+			#print(curr_vars_reshaped[0])
+			
+			curr_vars_concat = {i:tf.concat(curr_vars_reshaped[i], axis=0)
+				for i in range(self.n_replicas)}
+
+			init_vars_concat = {i:tf.concat(init_vars_reshaped[i], axis=0)
+				for i in range(self.n_replicas)}
+
+			#print(curr_vars_concat[0])
+			#print(init_vars_concat)
+
+			self.diffusion_tensors = {i:tf.norm(curr_vars_concat[i] - init_vars_concat[i])
+				for i in range(self.n_replicas)}
+
+
+			#self.curr_train_vars = train_vars_concat
+			#self.init_train_vars = init_train_vars
+			
 
 	def create_special_summary(self):
 		"""Special summary is everything except cross_validation, 
@@ -86,6 +130,11 @@ class Summary(object):
 				tf.summary.scalar('accept_ratio_ordered_' + str(i),
 					self.ordered_accept_ratio_plcholders[i],
 					collections=['special'])
+				tf.summary.scalar('diffusion_' + str(i),
+					self.diffusion_tensors[i], 
+					collections=['special'])
+
+
 
 			self.special_writer = tf.summary.FileWriter(
 				logdir=self.dir.get_special_dir(),
@@ -313,7 +362,7 @@ class Dir(object):
 		self.log_dir = os.path.join(log_dir, 'summaries', name) 
 		if (simulation_num is not None and
 			simulation_num != ''):
-			self.log_dir = os.path.join(self.log_dir, simulation_num)
+			self.log_dir = os.path.join(self.log_dir, str(simulation_num))
 		
 	
 	def get_special_dir(self):
