@@ -11,6 +11,7 @@ import pandas as pd
 import re
 
 from simulation.simulation_builder.summary import Dir
+from simulation.simulator_exceptions import InvalidExperimentValueError
 
 __DEBUG__ = False
 
@@ -428,4 +429,33 @@ def extract_and_remove_simulation(path):
 	se._dir.clean_dirs()
 
 
+def generate_experiment_name(architecture=None, dataset='mnist', 
+	tuning_param_name=None, optimizer='PTLD', swaps_type='dynamic', 
+	n_replicas=None, surface_view='energy', starting_beta=None, version='v2'):
+	
+	
+	"""Experiment name:
+	<arhictecture>_<dataset>_<tuning parameter>_<optimizer>_...
+	<dynamic=swaps occure/static=swaps don't occur>_...
+	<n_replicas>_<surface view>_<starting_beta_>
 
+		version: 'v2' means that summary has diffusion value in it
+	"""
+
+
+	if ((architecture is None or architecture not in ['cnn', 'nn']) 
+		or (dataset is None or  dataset not in ['mnist', 'cifar'])
+		or (tuning_param_name is None or tuning_param_name not in ['tempfactor', 'swapstep']) 
+		or (optimizer is None or optimizer not in ['PTLD'])
+		or (swaps_type is None or swaps_type not in ['dynamic', 'static'])
+		or (n_replicas is None)
+		or (surface_view is None or surface_view not in ['energy', 'info'])
+		or (starting_beta is None)):
+		raise InvalidExperimentValueError()
+
+	name = architecture + '_' + dataset + '_'
+	name = name + tuning_param_name + '_' + optimizer + '_'
+	name = name + swaps_type + '_' + str(n_replicas) + '_'
+	name = name + surface_view + '_' + str(starting_beta) + '_' + version
+
+	return name 
