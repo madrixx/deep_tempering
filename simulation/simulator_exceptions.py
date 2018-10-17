@@ -51,11 +51,13 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "dataset: 'mnist' or 'cifar' \n"
 		msg = msg + "tuning_param_name: 'swapstep' or 'tempfactor' \n"
 		msg = msg + "optimizer: 'PTLD' \n"
-		msg = msg + "swaps_type: static (no swaps) or dynamic (yes swaps)\n"
+		msg = msg + "do_swaps: True==do swap, False==do not swap\n"
+		msg = msg + "swap_proba: boltzamann or MAYBE add more (TODO)\n"
 		msg = msg + "n_replicas: int or str \n"
 		msg = msg + "surface_view: 'energy' or 'info' \n"
 		msg = msg + "starting_beta: int or str \n"
 		msg = msg + "loss_func: 'crossentropy' or 'zerooneloss' \n"
+		msg = msg + "swap_attempt_step: int or str"
 		self.msg = msg
 
 	def __str__(self):

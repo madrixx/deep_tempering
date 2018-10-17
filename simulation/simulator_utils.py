@@ -430,9 +430,9 @@ def extract_and_remove_simulation(path):
 
 
 def generate_experiment_name(architecture=None, dataset='mnist', 
-	tuning_param_name=None, optimizer='PTLD', swaps_type='dynamic', 
-	n_replicas=None, surface_view='energy', starting_beta=None, loss_func='crossentropy', 
-	version='v2'):
+	tuning_param_name=None, optimizer='PTLD', do_swaps=True, 
+	swap_proba='boltzmann', n_replicas=None, surface_view='energy', starting_beta=None, loss_func='crossentropy', 
+	swap_attempt_step=None, version='v2'):
 	
 	
 	"""Experiment name:
@@ -440,7 +440,7 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 	<dynamic=swaps occure/static=swaps don't occur>_...
 	<n_replicas>_<surface view>_<starting_beta_>
 
-		version: 'v2' means that summary has diffusion value in it
+		version: 'v2' means that summary stores diffusion value
 	"""
 
 
@@ -448,17 +448,19 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
 		or (tuning_param_name is None or tuning_param_name not in ['tempfactor', 'swapstep']) 
 		or (optimizer is None or optimizer not in ['PTLD'])
-		or (swaps_type is None or swaps_type not in ['dynamic', 'static'])
+		or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
+		or (swap_proba is None or swap_proba not in ['boltzmann'])
 		or (n_replicas is None)
 		or (surface_view is None or surface_view not in ['energy', 'info'])
 		or (starting_beta is None)
-		or (loss_func is None or loss_func not in ['crossentropy', 'zerooneloss'])):
+		or (loss_func is None or loss_func not in ['crossentropy', 'zerooneloss'])
+		or (swap_attempt_step is None )):
 		raise InvalidExperimentValueError()
 
 	name = architecture + '_' + dataset + '_'
 	name = name + tuning_param_name + '_' + optimizer + '_'
-	name = name + swaps_type + '_' + str(n_replicas) + '_'
+	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(starting_beta) + '_' 
-	name = name + loss_func + '_' + version
+	name = name + loss_func + '_' + str(swap_attempt_step) + '_' + version
 
 	return name 
