@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import tensorflow as tf
 from tensorflow.python.framework import ops
 from copy import deepcopy
+import numpy as np
 
 from simulation.simulation_builder.device_placer import _gpu_device_name
 
@@ -119,7 +120,19 @@ def copy_variable_to_graph(org_instance, to_graph, namespace):
 			device_name = '/cpu:0'
 
 		with tf.device(device_name):
-			new_var = tf.Variable(init_value,
+
+
+			n_inputs = int(org_instance.get_shape()[0])
+			try:
+				n_neurons = int(org_instance.get_shape()[1])
+				stddev = 2.0 / np.sqrt(n_inputs)
+				init = tf.truncated_normal((n_inputs, n_neurons), 
+					stddev=stddev)
+			except IndexError:
+				init = tf.zeros([n_inputs])
+			
+			
+			new_var = tf.Variable(init,
 								  trainable=trainable,
 								  name=new_name,
 								  collections=collections,
