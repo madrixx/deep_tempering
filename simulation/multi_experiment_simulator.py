@@ -73,8 +73,8 @@ class MultiExperimentSimulator(object):
 				validation_data=self.data['valid_data'], 
 				validation_labels=self.data['valid_labels']
 				)
-			if verbose: print()
-			if verbose: print('time took:', timer.elapsed_time(), 'min')
+			if self.verbose: print()
+			if self.verbose: print('time took:', timer.elapsed_time(), 'min')
 
 
 
