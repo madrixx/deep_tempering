@@ -1,0 +1,520 @@
+import os
+import sys
+
+import tensorflow as tf
+from tensorboard.backend.event_processing import event_accumulator
+import numpy as np
+import matplotlib.pyplot as plt
+import json
+import pickle
+import pandas as pd
+import re
+
+from simulation.simulation_builder.summary import Dir
+from simulation.simulator_exceptions import InvalidExperimentValueError
+
+
+class ExperimentPlot(object):
+
+	def __init__(self, experiment_extractors):
+		self._ee = {str(e):e for e in experiment_extractors}
+
+	def __str__(self):
+		return ', '.join(list(self._ee))
+
+	def plot_final_crossentropy_per_ordered_replica_vs_tempfactor(self, 
+		dataset_type, custom_text = ''):
+		
+		fig, ax = plt.subplots()
+		text = 'Average final cross entropy for best replica vs beta. \n'
+		ax.title.set_text(text + custom_text)
+
+		for k in self._ee:
+			dict_ = self._ee[k].final_crossentropy_per_ordered_replica_vs_tempfactor_data(
+				dataset_type)
+		
+			d = dict_[0]
+			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
+				elinewidth=1)
+			bar.set_label(self._ee[k])
+		
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.6, 0.5))
+		ax.set_xlabel('beta_i+1/beta_i')
+		ax.set_ylabel('Final crossentropy loss for best replica')
+		return fig
+
+	def plot_best_crossentropy_per_ordered_replica_vs_tempfactor(self, 
+		dataset_type, custom_text = ''):
+		
+		fig, ax = plt.subplots()
+		text = 'Average best cross entropy for best replica vs beta. \n'
+		ax.title.set_text(text + custom_text)
+
+		for k in self._ee:
+			dict_ = self._ee[k].best_crossentropy_per_ordered_replica_vs_tempfactor_data(
+				dataset_type)
+		
+			d = dict_[0]
+			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
+				elinewidth=1)
+			bar.set_label(self._ee[k])
+		
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.6, 0.5))
+		ax.set_xlabel('beta_i+1/beta_i')
+		ax.set_ylabel('Best crossentropy loss for best replica')
+		return fig
+
+	def plot_accept_ratio_per_replica_vs_tempfactor(self, custom_text=''):
+		fig, ax = plt.subplots()
+		text = 'Average best cross entropy for best replica vs beta. \n'
+		ax.title.set_text(text + custom_text)
+
+		for k in self._ee:
+			
+			dict_ = self._ee[k].accept_ratio_per_replica_vs_tempfactor_data()
+		
+			d = dict_[0]
+			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
+				elinewidth=1)
+			bar.set_label(self._ee[k])
+		
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.6, 0.5))
+		ax.set_xlabel('beta_i+1/beta_i')
+		ax.set_ylabel('Best crossentropy loss for best replica')
+		return fig
+
+
+class ExperimentExtractor(object):
+	def __init__(self, experiment_names):
+		names = list(set(['_'.join(e.split('_')[:-1])
+			for e in experiment_names]))
+		if len(names) > 1:
+			#print(names)
+			raise ValueError('Simulations must be from the same experiments, but given:',
+				names)
+		self._name = names[0]
+		self._se = {e:SummaryExtractor(e)
+			for e in experiment_names}
+
+
+	def __str__(self):
+		return self._name
+
+
+	def _create_dataframe(self, matching_keywords):
+		
+
+		df = None
+		index = 0
+
+		for e in self._se:
+			
+			n_replicas = int(e.split('_')[6])
+			surface_view = e.split('_')[7]
+			swap_attempt_step = int(e.split('_')[10])
+			beta_0 = float(e.split('_')[8])
+			experiment_num = int(e.split('_')[-1])
+
+			if df is None:
+				cols = [
+					'experiment_num',
+					'simulation_num', 
+					'n_replicas',
+					'replica_id', 
+					'temp_factor', 
+					'beta_0',
+					'swap_attempt_step',
+					'surface_view',
+					'final_matched_value',
+					'min_matched_value',
+					]
+				"""
+				for i in range(n_replicas):
+					cols.append('accept_ratio_replica_' + str(i))
+				"""
+				df = pd.DataFrame(columns=cols)
+
+			matched = self._extract_matching_summary_names_from_summary_extractor(
+				e, matching_keywords)
+			temp_factor = self._se[e].get_description()['temp_factor']
+
+			for summ in matched:
+				# summary_name example: '0/valid_ordered_0/cross_entropy'
+				# accept_ratio example: '0/special_summary/accept_ratio_ordered_0'
+				try:
+					simulation_num = int(summ.split('/')[0])
+				except ValueError:
+					continue
+				
+				if ('accept' in matching_keywords and
+					'ratio' in matching_keywords):
+					replica_id = int(summ.split('_')[-1])
+				else:
+					replica_id = int(summ.split('/')[1].split('_')[-1])
+				last_val = self._se[e].get_summary(summ)[1][-1]
+				min_val = self._se[e].get_summary(summ)[1].min()
+				#accept_ratio_replica = [self._se[e].get_summary('a')]
+				
+
+
+				vals = [
+					experiment_num,
+					simulation_num, 
+					n_replicas,
+					replica_id, 
+					temp_factor, 
+					beta_0,
+					swap_attempt_step,
+					surface_view,
+					last_val[0],
+					min_val]
+
+				try:
+					df.loc[index] = vals
+				except ValueError:
+					print(len(cols), len(vals))
+					raise
+				index += 1
+		return df
+
+	def best_crossentropy_per_ordered_replica_vs_tempfactor_data(self,
+		dataset_type='validation'):
+		dataset_type = ('valid' 
+			if dataset_type == 'validation' else dataset_type)
+
+		if dataset_type not in ['test', 'train', 'valid']:
+			raise ValueError("dataset_type must be only on of test/train/validation.")
+
+		matching_keywords = ['cross', 'entropy', 'ordered', dataset_type]
+		df = self._create_dataframe(matching_keywords)
+
+		n_replicas = list(set(df['n_replicas'].get_values().tolist()))
+		if len(n_replicas) > 1:
+			raise ValueError('n_replicas must be same for every experiment.')
+
+		n_replicas = n_replicas[0]
+		
+		experiment_num_list = list(set(df.experiment_num.get_values().tolist()))
+		
+		res = {}
+		for exp in sorted(experiment_num_list):
+			
+			for i in range(n_replicas):
+				if i not in res:
+					res[i] = {'x':[], 'y':[], 'err':[]}
+				#_df = df[df['experiment_num']==exp]
+				_df = df[(df['experiment_num']==exp) & (df['replica_id']==i)]
+				
+				mean = _df['min_matched_value'].mean(axis=0)
+				std = _df['min_matched_value'].std(axis=0)
+				tempf = list(set(_df['temp_factor'].get_values().tolist()))
+				if len(tempf) > 1:
+					raise ValueError('Somewhere above there is a bug...')
+
+				tempfactor = tempf[0]
+				res[i]['x'].append(tempfactor)
+				res[i]['y'].append(mean)
+				res[i]['err'].append(std)
+
+
+
+		return res 
+
+	def accept_ratio_per_replica_vs_tempfactor_data(self):
+		df = self._create_dataframe(['accept', 'ratio', 'replica'])
+		n_replicas = list(set(df['n_replicas'].get_values().tolist()))
+		if len(n_replicas) > 1:
+			raise ValueError('n_replicas must be same for every experiment.')
+
+		n_replicas = n_replicas[0]
+		
+		experiment_num_list = list(set(df.experiment_num.get_values().tolist()))
+		
+		res = {}
+		for exp in sorted(experiment_num_list):
+			
+			for i in range(n_replicas):
+				if i not in res:
+					res[i] = {'x':[], 'y':[], 'err':[]}
+				#_df = df[df['experiment_num']==exp]
+				_df = df[(df['experiment_num']==exp) & (df['replica_id']==i)]
+				
+				mean = _df['final_matched_value'].mean(axis=0)
+				std = _df['final_matched_value'].std(axis=0)
+				tempf = list(set(_df['temp_factor'].get_values().tolist()))
+				if len(tempf) > 1:
+					raise ValueError('Somewhere above there is a bug...')
+
+				tempfactor = tempf[0]
+				res[i]['x'].append(tempfactor)
+				res[i]['y'].append(mean)
+				res[i]['err'].append(std)
+
+
+
+		return res 
+
+
+
+	def final_crossentropy_per_ordered_replica_vs_tempfactor_data(self, 
+		dataset_type='validation'):
+		"""Returns avg final val of crossentropy per replica vs tempfactor.
+
+			Args: 
+				datasest_type: test/train/validation 
+
+			Returns:
+				Dataframe containing all values.
+
+		"""
+		
+		dataset_type = ('valid' 
+			if dataset_type == 'validation' else dataset_type)
+
+		if dataset_type not in ['test', 'train', 'valid']:
+			raise ValueError("dataset_type must be only on of test/train/validation.")
+
+		matching_keywords = ['cross', 'entropy', 'ordered', dataset_type]
+		df = self._create_dataframe(matching_keywords)
+
+		n_replicas = list(set(df['n_replicas'].get_values().tolist()))
+		if len(n_replicas) > 1:
+			raise ValueError('n_replicas must be same for every experiment.')
+
+		n_replicas = n_replicas[0]
+		
+		experiment_num_list = list(set(df.experiment_num.get_values().tolist()))
+		
+		res = {}
+		for exp in sorted(experiment_num_list):
+			
+			for i in range(n_replicas):
+				if i not in res:
+					res[i] = {'x':[], 'y':[], 'err':[]}
+				#_df = df[df['experiment_num']==exp]
+				_df = df[(df['experiment_num']==exp) & (df['replica_id']==i)]
+				
+				mean = _df['final_matched_value'].mean(axis=0)
+				std = _df['final_matched_value'].std(axis=0)
+				tempf = list(set(_df['temp_factor'].get_values().tolist()))
+				if len(tempf) > 1:
+					raise ValueError('Somewhere above there is a bug...')
+
+				tempfactor = tempf[0]
+				res[i]['x'].append(tempfactor)
+				res[i]['y'].append(mean)
+				res[i]['err'].append(std)
+
+
+
+		return res 
+
+
+	
+
+	def _extract_matching_summary_names_from_summary_extractor(self, 
+		experiment_name, matching_keywords):
+		"""Filters available summaries names based on matching_keywords vals.
+
+		Args:
+			summary_name: Name of the experiment (one of the 
+				experiment_names provided during initialization).
+			matching_keywords: All summaries that has ALL of these
+				keywords will be matched and their names returned.
+				NOTE: To match, the string splits based on r"/|_".
+		Returns:
+			Names of the found summaries of SummaryExtractor 
+			experiment_name.
+
+		"""
+
+		se = self._se[experiment_name]
+		matched = [s for s in se.list_available_summaries() 
+			if all(x in re.split(r"/|_", s) for x in matching_keywords)]
+
+		return matched
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class SummaryExtractor(object):
+
+	def __init__(self, name):
+		
+
+		self._dir = Dir(name)
+		self.all_summs_dict = {}
+		
+		for i in range(100):
+			try:
+				self.all_summs_dict.update(extract_summary(
+					self._dir.log_dir + self._dir.delim + str(i)), delim=self._dir.delim)
+			except FileNotFoundError: 
+				self.all_summs_dict.pop('delim', None)
+				#print(i, 'simulations')
+				self.n_experiments = i
+				self._create_experiment_averages()
+
+				break
+
+	def get_summary(self, summ_name, split=True):
+		"""Returns numpy arrays (x, y) of summaries.
+
+		Args:
+			summary_type: Name of the scalar summary
+			
+
+		Returns:
+			(x, y) numpy array
+		"""
+		if split:
+			return np.hsplit(self.all_summs_dict[summ_name], 2)
+		else:
+			return self.all_summs_dict[summ_name]
+
+	def list_available_summaries(self):
+		return sorted(set([k for k in self.all_summs_dict.keys()]))
+		
+
+	def plot(self, keys=['valid'], match=None, add_swap_marks=False):
+		n_col = 0
+
+		fig, ax = plt.subplots()
+		for s in self.list_available_summaries():
+			summ_name = s.split('/') if match == 'exact' else s
+			if all(x in summ_name for x in keys):
+				x, y = self.get_summary(s)
+				ax.plot(x, y, label=s)
+				n_col += 1
+				
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.6, 0.5))
+
+		if add_swap_marks:
+			js = self.get_description()
+			step = js['swap_attempt_step']
+			s = self.list_available_summaries()[0]
+			x, y = self.get_summary(s)
+			len_ = int(x[-1][0])
+			for i in range(0, len_, step):
+				ax.axvline(x=i)
+		return fig
+
+	def get_description(self):
+		d = self._dir.delim
+		file = self._dir.log_dir.replace('summaries'+d, 'summaries'+d+'compressed'+d)
+		with open(os.path.join(file, 'description.json')) as fo:
+			js = json.load(fo)
+
+		return js
+
+	def _create_experiment_averages(self):
+		all_keys = self.list_available_summaries()
+		try:
+			all_keys.sort(key=lambda x: x.split('/')[1] + x.split('/')[-1])
+		except IndexError:
+			
+			raise
+		completed_keys = []
+
+		for k in all_keys:
+			if k in completed_keys:
+				continue
+			name = '/'.join(k.split('/')[1:])
+			arrays = [self.get_summary(str(i) + '/' + name, split=False)
+				for i in range(self.n_experiments)]
+			self.all_summs_dict['mean/' + name] = np.mean(np.array(arrays), axis=0)
+
+
+def extract_summary(log_dir, delim="/"):
+	"""
+	Extracts summaries from simulation `name`
+
+	Args:
+		log_dir: directory
+		tag: summary name (e.g. cross_entropy, zero_one_loss ...)
+
+	Returns:
+		A dict where keys are names of the summary scalars and
+		vals are numpy arrays of tuples (step, value)
+
+	"""	
+
+	delim ="\\" if 'win' in sys.platform else '/'
+	
+	compressed_dir = log_dir.replace('summaries'+delim, 'summaries'+delim+'compressed'+delim)
+	summary_filename = os.path.join(compressed_dir, 'summary.pickle') 
+	
+	src_description_file = os.path.join(delim.join(log_dir.split(delim)[:-1]), 'description.json')
+	dst_description_file = os.path.join(delim.join(compressed_dir.split(delim)[:-1]), 'description.json')
+
+	if not os.path.exists(compressed_dir):
+		
+		os.makedirs(compressed_dir)
+
+		with open(src_description_file) as fo:
+			js = json.load(fo)
+		
+		with open(dst_description_file, 'w') as fo:
+			json.dump(js, fo, indent=4)
+
+	if os.path.exists(summary_filename):
+
+		with open(summary_filename, 'rb') as fo:
+			res = pickle.load(fo)
+			return res
+	else:
+
+
+		sim_num = log_dir.split(delim)[-1]
+		res = {}
+		for file in os.listdir(log_dir):
+			fullpath = os.path.join(log_dir, file)
+
+			if os.path.isdir(fullpath):
+			
+				for _file in os.listdir(fullpath):
+					
+					filename = os.path.join(fullpath, _file)
+					
+					ea = event_accumulator.EventAccumulator(filename)
+					ea.Reload()
+					for k in ea.scalars.Keys():
+						lc = np.stack(
+							[np.asarray([scalar.step, scalar.value])
+							for scalar in ea.Scalars(k)])
+						key_name = sim_num + '/' + file + '/' +  k.split('/')[-1]
+						key_name = '/'.join(key_name.split('/')[-3:])
+						res[key_name] = lc
+		
+		with open(summary_filename, 'wb') as fo:
+			pickle.dump(res, fo)
+	
+	
+	return res
