@@ -298,10 +298,13 @@ class GraphBuilder(object):
 		self.ordered_n_swap_attempts[sorted_i] += 1
 		self.ordered_n_swap_attempts[sorted_j] += 1
 
-		if self._surface_view == 'information':
+		if self._surface_view == 'information' or self._surface_view == 'info':
 			l1, l2 = loss_list[i]/beta[i], loss_list[j]/beta[j]
-		else:
+		elif self._surface_view == 'energy':
 			l1, l2 = loss_list[i], loss_list[j] # energy
+		else:
+			raise ValueError('surface_view can be only one of:',
+				'information/info/energy')
 		
 		accept_proba = np.exp((l1-l2)*(beta[i] - beta[j]))
 		self.latest_accept_proba = accept_proba
