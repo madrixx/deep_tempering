@@ -22,12 +22,20 @@ class ExperimentPlot(object):
 	def __str__(self):
 		return ', '.join(list(self._ee))
 
+
+
 	def plot_final_crossentropy_per_ordered_replica_vs_tempfactor(self, 
-		dataset_type, custom_text = ''):
+		dataset_type, custom_text = '', markeredgewidth=0.05, elinewidth=0.5,
+		set_ylim=None, set_xlim=None):
 		
 		fig, ax = plt.subplots()
 		text = 'Average final cross entropy for best replica vs beta. \n'
 		ax.title.set_text(text + custom_text)
+		
+		if set_ylim:
+			ax.set_ylim(top=set_ylim)
+		if set_xlim:
+			ax.set_xlim(right=set_xlim)
 
 		for k in self._ee:
 			dict_ = self._ee[k].final_crossentropy_per_ordered_replica_vs_tempfactor_data(
@@ -35,7 +43,7 @@ class ExperimentPlot(object):
 		
 			d = dict_[0]
 			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
-				elinewidth=1)
+				elinewidth=elinewidth, markeredgewidth=markeredgewidth)
 			bar.set_label(self._ee[k])
 		
 		box = ax.get_position()
@@ -47,11 +55,17 @@ class ExperimentPlot(object):
 		return fig
 
 	def plot_best_crossentropy_per_ordered_replica_vs_tempfactor(self, 
-		dataset_type, custom_text = ''):
+		dataset_type, custom_text = '', markeredgewidth=0.05, elinewidth=0.5,
+		set_ylim=None, set_xlim=None):
 		
 		fig, ax = plt.subplots()
 		text = 'Average best cross entropy for best replica vs beta. \n'
 		ax.title.set_text(text + custom_text)
+
+		if set_ylim:
+			ax.set_ylim(top=set_ylim)
+		if set_xlim:
+			ax.set_xlim(right=set_xlim)
 
 		for k in self._ee:
 			dict_ = self._ee[k].best_crossentropy_per_ordered_replica_vs_tempfactor_data(
@@ -59,7 +73,7 @@ class ExperimentPlot(object):
 		
 			d = dict_[0]
 			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
-				elinewidth=1)
+				elinewidth=elinewidth, markeredgewidth=markeredgewidth)
 			bar.set_label(self._ee[k])
 		
 		box = ax.get_position()
@@ -70,10 +84,17 @@ class ExperimentPlot(object):
 		ax.set_ylabel('Best crossentropy loss for best replica')
 		return fig
 
-	def plot_accept_ratio_per_replica_vs_tempfactor(self, custom_text=''):
+	def plot_accept_ratio_per_replica_vs_tempfactor(self, custom_text='', 
+		markeredgewidth=0.05, elinewidth=0.5,
+		set_ylim=None, set_xlim=None):
 		fig, ax = plt.subplots()
 		text = 'Average best cross entropy for best replica vs beta. \n'
 		ax.title.set_text(text + custom_text)
+
+		if set_ylim:
+			ax.set_ylim(top=set_ylim)
+		if set_xlim:
+			ax.set_xlim(right=set_xlim)
 
 		for k in self._ee:
 			
@@ -81,7 +102,7 @@ class ExperimentPlot(object):
 		
 			d = dict_[0]
 			bar = ax.errorbar(x=d['x'], y=d['y'], yerr=d['err'], capsize=2,
-				elinewidth=1)
+				elinewidth=elinewidth, markeredgewidth=markeredgewidth)
 			bar.set_label(self._ee[k])
 		
 		box = ax.get_position()
@@ -380,6 +401,48 @@ class SummaryExtractor(object):
 				self._create_experiment_averages()
 
 				break
+
+	def plot_diffusion(self, add_swap_marks=False, N=0):
+		#N = number of simulation to show
+		n_col = 0
+		keys = 'diffusion'
+		match = None
+		fig, ax = plt.subplots()
+		for s in self.list_available_summaries():
+			summ_name = s.split('/') if match == 'exact' else s
+			try:
+				n = int(s.split('/')[0])
+			except:
+				continue
+			if n != N:
+				continue
+			if all(x in summ_name for x in keys):
+				x, y = self.get_summary(s)
+				ax.plot(x, y, label=s)
+				n_col += 1
+				
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.6, 0.5))
+
+		if add_swap_marks:
+			summ_name = str(N) + '/special_summary/swapped_replica_pair'
+			js = self.get_description()
+			step = js['swap_attempt_step']
+			#s = self.list_available_summaries()[0]
+			x, y = self.get_summary(summ_name)
+
+			len_ = int(x[-1][0])
+			cnt = 0
+			for i in range(0, len_, step):
+				#print(x[int(i/len_)], int(i/len_), i, len_)
+				if y[cnt+1][0] != -1:
+					ax.axvline(x=i, linewidth=0.9, linestyle=':')
+				cnt += 1
+		return fig
+
+
 
 	def get_summary(self, summ_name, split=True):
 		"""Returns numpy arrays (x, y) of summaries.
