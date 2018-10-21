@@ -34,10 +34,11 @@ class GraphBuilder(object):
 		self._name = name
 		self._surface_view = surface_view
 		self._graph = tf.Graph()
-		self._noise_list = sorted_noise_list(noise_list, noise_type)
+		self._noise_list = (sorted(noise_list) 
+			if noise_type == 'random_normal' or noise_type == 'betas' or 'LDSamper'
+			else sorted(noise_list, reverse=True))
 		self._summary_type = summary_type
 		self._simulation_num = '' if simulation_num is None else str(simulation_num)
-		
 		# create graph with duplicates based on architecture function 
 		# and noise type 
 		res = []
@@ -90,12 +91,11 @@ class GraphBuilder(object):
 		self.swap_accept_ratio = 0.0
 		self.n_swap_attempts = 0
 		self.latest_accept_proba = 1.0
-		self.latest_swapped_pair = 0   
+		self.latest_swapped_pair = -1 
 		self.replica_swap_ratio = {i:0.0 for i in range(self._n_replicas)}
 		self.ordered_swap_ratio = {i:0.0 for i in range(self._n_replicas)}
 		self.replica_n_swap_attempts = {i:0 for i in range(self._n_replicas)}
 		self.ordered_n_swap_attempts = {i:0 for i in range(self._n_replicas)}
-
 		
 		with self._graph.as_default():
 			for i in range(self._n_replicas):
@@ -134,7 +134,6 @@ class GraphBuilder(object):
 				self._optimizer_dict, summary_type=self._summary_type)
 
 			self.variable_initializer = tf.global_variables_initializer()
-
 
 
 	def create_feed_dict(self, X_batch, y_batch, dataset_type='train'):
@@ -195,16 +194,11 @@ class GraphBuilder(object):
 		# evaluated = sess.run(get_train_ops(), feed_dict=...)
 		
 		Args:
-			dataset_type: 'train'/'test'/'validation'. If not 'test',
-				the ops for optimization aren't included in the 
-				returned list.
+			test: if True, doesn't include ops for optimizing gradients 
+				in the returned list.
 
 		Returns:
 			train_ops for session run.
-
-		Raises:
-			InvalidDatasetTypeError if dataset_type is not on of:
-				'train'/'test'/'validation'
 		"""
 
 		loss = [self._cross_entropy_loss_dict[i] for i in range(self._n_replicas)]
@@ -222,40 +216,18 @@ class GraphBuilder(object):
 			raise InvalidDatasetTypeError()
 
 	def add_summary(self, evaluated, step, dataset_type='train'):
-		"""Wrapper for tf.summary.FileWriter.add_summary for all summaries.
-
-		Args:
-			evaluated: A list returned by sess.run([get_train_ops()])
-			step: iteration step (argument for 
-				summary.FileWriter.add_summary)
-			dataset_type: 'train'/'test'/'validation'
-
-		"""
 		summs = self.extract_evaluated_tensors(evaluated, 'summary')
 		self._summary.add_summary(summs, step, dataset_type)
 
-	def extract_evaluated_tensors(self, evaluated, tensor_name):
-		"""Extracts from a list returned by sess.run(get_train_ops()).
-
-		Args:
-			evaluated: A list returned by sess.run([get_train_ops()])
-			tensor_name: 'cross_entropy', 'zero_one_loss', 'summary'
+	def extract_evaluated_tensors(self, evaluated, tensor_type):
 		
-		Returns:
-			A list of evaluated tensors `tensor_name`.
-
-		Raises: 
-			ValueError if tensor_name is not one of 'cross_entropy',
-				'zero_one_loss', 'summary'
-
-		"""
-		if tensor_name == 'cross_entropy':
+		if tensor_type == 'cross_entropy':
 			return evaluated[:self._n_replicas]
 		
-		elif tensor_name == 'zero_one_loss':
+		elif tensor_type == 'zero_one_loss':
 			return evaluated[self._n_replicas:2*self._n_replicas]
 
-		elif tensor_name == 'summary':
+		elif tensor_type == 'summary':
 			end_mult = (4 if self._summary_type is None else 3)
 			if len(evaluated) % self._n_replicas == 0:
 				return evaluated[2*self._n_replicas:end_mult*self._n_replicas]
@@ -263,8 +235,7 @@ class GraphBuilder(object):
 				# special summary case
 				return evaluated[2*self._n_replicas:end_mult*self._n_replicas + 1]
 		else:
-			raise ValueError("tensor_name must be one of",
-				'cross_entropy, zero_one_loss, summary') 
+			raise InvalidLossFuncError() 
 
 	def update_noise_vals(self, evaluated):
 		"""Updates noise values based on loss function.
@@ -327,13 +298,10 @@ class GraphBuilder(object):
 		self.ordered_n_swap_attempts[sorted_i] += 1
 		self.ordered_n_swap_attempts[sorted_j] += 1
 
-		if self._surface_view == 'information' or self._surface_view == 'info':
+		if self._surface_view == 'information':
 			l1, l2 = loss_list[i]/beta[i], loss_list[j]/beta[j]
-		elif self._surface_view == 'energy':
-			l1, l2 = loss_list[i], loss_list[j] # energy
 		else:
-			raise ValueError('surface_view can be only one of:',
-				'information/info/energy')
+			l1, l2 = loss_list[i], loss_list[j] # energy
 		
 		accept_proba = np.exp((l1-l2)*(beta[i] - beta[j]))
 		self.latest_accept_proba = accept_proba
@@ -399,11 +367,8 @@ class GraphBuilder(object):
 	
 
 
-def sorted_noise_list(noise_list, noise_type):
-	"""Helper for sorting noise_list based on noise_type."""	
-	return (sorted(noise_list) 
-			if noise_type == 'random_normal' or noise_type == 'betas' or 'LDSamper'
-			else sorted(noise_list, reverse=True))
+	
+
 
 
 
