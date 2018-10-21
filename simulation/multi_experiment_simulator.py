@@ -9,7 +9,7 @@ class MultiExperimentSimulator(object):
 		n_simulations=10, batch_size=50, n_epochs=25, swap_attempt_step=400, 
 		dataset_name='mnist', tuning_param_name='tempfactor', swap_proba='boltzmann',
 		optimizer_name='PTLD', loss_func_name='crossentropy', do_swaps=True, 
-		description='v2', verbose=True):
+		start_experiments_at=0, burn_in_period=None, description='v3', verbose=True):
 
 		self.n_experiments = len(tuning_parameter_vals)
 
@@ -41,13 +41,15 @@ class MultiExperimentSimulator(object):
 		self.verbose = verbose
 		self.data = data
 		self.noise_type = noise_type
+		self.start_experiments_at = start_experiments_at
+		self.burn_in_period = burn_in_period
 
 
 
 	def run_all(self):
 		
 		timer = Timer()
-		for exp in range(self.n_experiments):
+		for exp in range(self.start_experiments_at, self.n_experiments):
 			temp_factor = self.tuning_parameter_vals[exp]
 			name = self.experiment_name + '_' + str(exp)
 			if self.verbose: print('experiment:', exp+1, '/', self.n_experiments)
@@ -64,7 +66,8 @@ class MultiExperimentSimulator(object):
 				swap_attempt_step=self.swap_attempt_step, 
 				temp_factor=temp_factor,
 				tuning_parameter_name=self.tuning_param_name,
-				surface_view=self.surface_view, description=self.description)
+				surface_view=self.surface_view, burn_in_period=self.burn_in_period,
+				description=self.description)
 
 			sim.train_n_times(sim.train_PTLD, train_data=self.data['train_data'],
 				train_labels=self.data['train_labels'], 

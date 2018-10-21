@@ -56,6 +56,8 @@ class MultiExperimentSummaryExtractor(object):
 					
 					js = extractor.get_description()
 					param_name = js['tuning_parameter_name']
+					if param_name == 'tempfactor':
+						param_name = 'temp_factor'
 					param_names_list.append(param_name)
 					param_val = "{:10.2f}".format(float(js[param_name]))
 					if param_min and param_min > float(param_val):
@@ -87,7 +89,7 @@ class MultiExperimentSummaryExtractor(object):
 
 		return fig
 
-	def create_df(self, variable_names, thresh=0.3, df_name=None):
+	def create_df(self, variable_names, thresh=0.0, df_name=None):
 		def sort_foo(x):
 			se = self.summary_extractors[x]
 			return se.get_description()['temp_factor']
@@ -109,7 +111,11 @@ class MultiExperimentSummaryExtractor(object):
 					continue
 				sim_num = int(summ_name.split('/')[0])
 				if 'accept' in variable_names:
-					id_ = int(summ_name.split('_')[-1])
+					try:
+						id_ = int(summ_name.split('/')[0])
+					except ValueError:
+						print(summ_name.split('_'))
+						raise
 				else:
 
 					try:
@@ -130,35 +136,16 @@ class MultiExperimentSummaryExtractor(object):
 				values = se.get_summary(summ_name)
 				values = [v[0] for v in values[1]]
 				values = [experiment_num, sim_num, id_, temp_factor] + values[start_indx:]
-				df.loc[index] = values
+				try:
+					df.loc[index] = values
+				except ValueError:
+					print(len(values))
+					print(len(cols))
+					raise
 				index += 1
 			experiment_num += 1
 		return df
-		"""
-		summ_extractors = [k for k in self.summary_extractors.keys() if experiment_name in k]
-		df = None
-		cnt = 0
-		for s in summ_extractors:
-			se = self.summary_extractors[s]
-			summs_names = [n for n in se.list_available_summaries()
-				if all(x in re.split(r"/|_", n) for x in variable_names)]
-			if df is None:
-				v0 = se.get_summary('0/special_summary/accept_ratio_replica_0')
-				v_cols = [v[0] for v in v0[0]]
-				start_indx = int(len(v_cols)*thresh)
-				v_cols = v_cols[start_indx:]
-				v_cols = ['sim_n', 'id'] + v_cols
-				
-				df = pd.DataFrame(columns=v_cols)
-
-			for name in summs_names:
-				summ_vals = se.get_summary(name)
-				vals = [int(name.split('/')[0]), int(name.split('_')[-1])]
-				vals = vals + [v[0] for v in summ_vals[1][start_indx:]]
-				df.loc[cnt] = vals
-			
-		return df
-		"""
+		
 
 	def get_last_value_mean_std_report(self, df, experiment_num):
 		n_ids = int(df.id.max())
@@ -243,6 +230,28 @@ class MultiExperimentSummaryExtractor(object):
 
 		return mean_of_means, stddev_of_means, temp_factors
 
+	def generate_cross_entropy_data_summarized(self):
+		mean_of_means = []
+		stddev_of_means = []
+		temp_factors = []
+
+		df = self.create_df(['cross', 'replica'])
+		for i in range(100):
+			temp_factor = self.get_summary_extractor_by_experiment_num(i)
+			
+			if temp_factor is not None:
+				temp_factor = temp_factor.get_description()['temp_factor']
+			else:
+				break
+			temp_factors.append(temp_factor)
+			report = self.get_accept_ratio_mean_std_report(df, i)
+			mom = self.get_mean_of_means_from_report(report)
+			som = self.get_stddev_of_means_from_report(report)
+
+			mean_of_means.append(mom)
+			stddev_of_means.append(som)
+
+		return mean_of_means, stddev_of_means, temp_factors
 
 
 
@@ -432,7 +441,7 @@ def extract_and_remove_simulation(path):
 def generate_experiment_name(architecture=None, dataset='mnist', 
 	tuning_param_name=None, optimizer='PTLD', do_swaps=True, 
 	swap_proba='boltzmann', n_replicas=None, surface_view='energy', starting_beta=None, loss_func='crossentropy', 
-	swap_attempt_step=None, version='v2'):
+	swap_attempt_step=None, version='v3'):
 	
 	
 	"""Experiment name:
@@ -441,6 +450,8 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 	<n_replicas>_<surface view>_<starting_beta_>
 
 		version: 'v2' means that summary stores diffusion value
+		version: 'v3' means added burn-in period of 33% of all
+			steps
 	"""
 
 

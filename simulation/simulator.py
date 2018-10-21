@@ -34,7 +34,7 @@ class Simulator(object):
 	def __init__(self, architecture, learning_rate, noise_list, noise_type, 
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
-		tuning_parameter_name=None, surface_view='information', description=None):
+		tuning_parameter_name=None, burn_in_period=None, surface_view='information', description=None):
 		
 		if n_simulations == 1:
 			self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
@@ -48,6 +48,8 @@ class Simulator(object):
 		self.learning_rate = learning_rate
 		self.name = name
 		self.n_simulations = n_simulations
+		self.burn_in_period = burn_in_period 
+			
 
 		self.batch_size = batch_size
 		self.n_epochs = n_epochs
@@ -109,6 +111,7 @@ class Simulator(object):
 				next_batch = iterator.get_next()
 
 				# validation first time
+				"""
 				valid_feed_dict = g.create_feed_dict(
 					valid_data, valid_labels, 'validation')
 				evaluated = sess.run(g.get_train_ops('validation'),
@@ -116,7 +119,7 @@ class Simulator(object):
 				g.add_summary(evaluated, step, dataset_type='validation')
 				g.swap_replicas(evaluated)
 				g._summary.flush_summary_writer()
-				
+				"""
 				for epoch in range(self.n_epochs):
 					
 					while True:
@@ -140,7 +143,7 @@ class Simulator(object):
 								
 								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
 								
-							### validation ###
+							### validation + swaps ###
 							if step % self.swap_attempt_step == 0:
 								
 								valid_feed_dict = g.create_feed_dict(
@@ -148,7 +151,10 @@ class Simulator(object):
 								evaluated = sess.run(g.get_train_ops('validation'),
 									feed_dict=valid_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='validation')
-								g.swap_replicas(evaluated)
+								if step > self.burn_in_period:
+									
+									g.swap_replicas(evaluated)
+
 
 								g._summary.flush_summary_writer()
 						
@@ -229,7 +235,8 @@ class Simulator(object):
 								evaluated = sess.run(g.get_train_ops('validation'),
 									feed_dict=valid_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='validation')
-								g.swap_replicas(evaluated)
+								if step > self.burn_in_period:
+									g.swap_replicas(evaluated)
 
 								g._summary.flush_summary_writer()
 						
@@ -260,7 +267,8 @@ class Simulator(object):
 			'n_simulations': self.n_simulations,
 			'tuning_parameter_name':self.tuning_parameter_name,	
 			'surface_view':self.surface_view,
-			'description':desciption
+			'description':desciption,
+			'burn_in_period':self.burn_in_period
 
 		}
 		with open(filepath, 'w') as fo:
