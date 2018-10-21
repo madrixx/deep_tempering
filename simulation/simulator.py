@@ -34,11 +34,13 @@ class Simulator(object):
 	def __init__(self, architecture, learning_rate, noise_list, noise_type, 
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
-		tuning_parameter_name=None, burn_in_period=None, surface_view='information', description=None):
+		tuning_parameter_name=None, burn_in_period=None, 
+		loss_func_name='cross_entropy', 
+		surface_view='information', description=None):
 		
 		if n_simulations == 1:
 			self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
-				name, noise_type, summary_type)
+				name, noise_type, summary_type, loss_func_name=loss_func_name)
 		
 		self.architecture = architecture
 		self.learning_rate = learning_rate
@@ -49,6 +51,7 @@ class Simulator(object):
 		self.name = name
 		self.n_simulations = n_simulations
 		self.burn_in_period = burn_in_period 
+		self.loss_func_name = loss_func_name
 			
 
 		self.batch_size = batch_size
@@ -71,7 +74,8 @@ class Simulator(object):
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
-				self.summary_type, simulation_num=i, surface_view=self.surface_view)
+				self.summary_type, simulation_num=i, surface_view=self.surface_view,
+				loss_func_name=self.loss_func_name)
 			
 			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
@@ -194,7 +198,7 @@ class Simulator(object):
 				sess.run(iterator.initializer)
 				sess.run(g.variable_initializer)
 				next_batch = iterator.get_next()
-
+				"""
 				# validation first time
 				valid_feed_dict = g.create_feed_dict(
 					valid_data, valid_labels, 'validation')
@@ -203,6 +207,7 @@ class Simulator(object):
 				g.add_summary(evaluated, step, dataset_type='validation')
 				g.swap_replicas(evaluated)
 				g._summary.flush_summary_writer()
+				"""
 				
 				for epoch in range(self.n_epochs):
 					
@@ -237,7 +242,8 @@ class Simulator(object):
 								g.add_summary(evaluated, step, dataset_type='validation')
 								if step > self.burn_in_period:
 									g.swap_replicas(evaluated)
-
+								else:
+									g.swap_accept_ratio = 0
 								g._summary.flush_summary_writer()
 						
 						except tf.errors.OutOfRangeError:

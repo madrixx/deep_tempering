@@ -43,6 +43,7 @@ class MultiExperimentSimulator(object):
 		self.noise_type = noise_type
 		self.start_experiments_at = start_experiments_at
 		self.burn_in_period = burn_in_period
+		self.loss_func_name = loss_func_name
 
 
 
@@ -52,7 +53,8 @@ class MultiExperimentSimulator(object):
 		for exp in range(self.start_experiments_at, self.n_experiments):
 			temp_factor = self.tuning_parameter_vals[exp]
 			name = self.experiment_name + '_' + str(exp)
-			if self.verbose: print('experiment:', exp+1, '/', self.n_experiments)
+			if self.verbose: print('experiment:', exp+1, '/', self.n_experiments, 
+				', param_val:', temp_factor)
 			if self.verbose: print(name)
 
 			noise_list = [self.beta_0*temp_factor**i for i in range(self.n_replicas)]
@@ -67,7 +69,7 @@ class MultiExperimentSimulator(object):
 				temp_factor=temp_factor,
 				tuning_parameter_name=self.tuning_param_name,
 				surface_view=self.surface_view, burn_in_period=self.burn_in_period,
-				description=self.description)
+				loss_func_name=self.loss_func_name, description=self.description)
 
 			sim.train_n_times(sim.train_PTLD, train_data=self.data['train_data'],
 				train_labels=self.data['train_labels'], 

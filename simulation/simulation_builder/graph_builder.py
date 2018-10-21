@@ -25,7 +25,7 @@ class GraphBuilder(object):
 
 	def __init__(self, architecture, learning_rate, noise_list, name, 
 		noise_type='random_normal', summary_type=None, simulation_num=None, 
-		surface_view='information'):
+		surface_view='information', loss_func_name='cross_entropy'):
 		
 		self._architecture = architecture
 		self._learning_rate = learning_rate
@@ -39,6 +39,7 @@ class GraphBuilder(object):
 			else sorted(noise_list, reverse=True))
 		self._summary_type = summary_type
 		self._simulation_num = '' if simulation_num is None else str(simulation_num)
+		self._loss_func_name = loss_func_name
 		# create graph with duplicates based on architecture function 
 		# and noise type 
 		res = []
@@ -126,7 +127,16 @@ class GraphBuilder(object):
 						noise_list=self._noise_list)
 					
 					self._optimizer_dict[i] = optimizer
-					optimizer.minimize(self._cross_entropy_loss_dict[i])
+
+					if (self._loss_func_name == 'cross_entropy' or 
+						self._loss_func_name == 'crossentropy'):
+						optimizer.minimize(self._cross_entropy_loss_dict[i])
+					elif self._loss_func_name == 'zero_one_loss':
+						optimizer.minimize(self._zero_one_loss_dict[i])
+					else:
+						raise ValueError('Invalid loss function name. ',
+							'Available functions are: cross_entropy/zero_one_loss,',
+							'But given:', self._loss_func_name)
 			
 			self._summary = Summary(self._graph, self._n_replicas, self._name, 
 				self._cross_entropy_loss_dict, self._zero_one_loss_dict, self._noise_list, 
@@ -345,7 +355,7 @@ class GraphBuilder(object):
 	def _store_tf_graph(self, path): tf.summary.FileWriter(path, self.graph).close()
 	
 	def _cross_entropy_loss(self, y, logits, clip_value_max=100.0):
-		with tf.name_scope('CrossEntropyLoss'):
+		with tf.name_scope('cross_entropy'):
 			with tf.device('/cpu:0'):
 				cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
 					labels=y, logits=logits)
