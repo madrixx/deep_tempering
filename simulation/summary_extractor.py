@@ -5,6 +5,7 @@ import tensorflow as tf
 from tensorboard.backend.event_processing import event_accumulator
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import axes3d, Axes3D
 import json
 import pickle
 import pandas as pd
@@ -25,8 +26,8 @@ class ExperimentPlot(object):
 
 
 	def plot_final_crossentropy_per_ordered_replica_vs_tempfactor(self, 
-		dataset_type, custom_text = '', markeredgewidth=0.05, elinewidth=0.5,
-		set_ylim=None, set_xlim=None):
+		dataset_type='validation', custom_text = '', markeredgewidth=0.05, 
+		elinewidth=0.5, set_ylim=None, set_xlim=None):
 		
 		fig, ax = plt.subplots()
 		text = 'Average final cross entropy for best replica vs beta. \n'
@@ -55,8 +56,8 @@ class ExperimentPlot(object):
 		return fig
 
 	def plot_best_crossentropy_per_ordered_replica_vs_tempfactor(self, 
-		dataset_type, custom_text = '', markeredgewidth=0.05, elinewidth=0.5,
-		set_ylim=None, set_xlim=None):
+		dataset_type='validation', custom_text = '', markeredgewidth=0.05, 
+		elinewidth=0.5, set_ylim=None, set_xlim=None):
 		
 		fig, ax = plt.subplots()
 		text = 'Average best cross entropy for best replica vs beta. \n'
@@ -110,7 +111,7 @@ class ExperimentPlot(object):
 		ax.legend(loc='center right', fancybox=True, shadow=True, 
 			bbox_to_anchor=(1.6, 0.5))
 		ax.set_xlabel('beta_i+1/beta_i')
-		ax.set_ylabel('Best crossentropy loss for best replica')
+		ax.set_ylabel('Average over all replicas acceptance ratio vs beta_i+1/beta_i')
 		return fig
 
 
@@ -126,9 +127,97 @@ class ExperimentExtractor(object):
 		self._se = {e:SummaryExtractor(e)
 			for e in experiment_names}
 
+		self.df = None
+
 
 	def __str__(self):
 		return self._name
+
+	def _create_dataframe_all_vals(self):
+		if self.df is not None:
+			return self.df
+		
+		loss_matching_keys = ['valid', 'ordered', 'cross', 'entropy']
+
+
+
+
+		
+		
+
+		for e in self._se:
+			
+			n_replicas = int(e.split('_')[6])
+			surface_view = e.split('_')[7]
+			swap_attempt_step = int(e.split('_')[10])
+			beta_0 = float(e.split('_')[8])
+			experiment_num = int(e.split('_')[-1])
+			experiment_name = e
+
+			if self.df is None:
+				cols = [
+					'experiment_name',
+					'experiment_num',
+					'simulation_num', 
+					'n_replicas',
+					'replica_id', 
+					'temp_factor', 
+					'beta_0',
+					'swap_attempt_step',
+					'surface_view',
+					'final_loss',
+					'min_loss',
+					'accept_ratio'
+					]
+				"""
+				for i in range(n_replicas):
+					cols.append('accept_ratio_replica_' + str(i))
+				"""
+				self.df = pd.DataFrame(columns=cols)
+				index = 0
+			for summ_name in self._se[e].list_available_summaries():
+				if (all(x in summ_name for x in loss_matching_keys) and
+					'mean' not in summ_name) :
+					try:
+						replica_id = int(summ_name.split('/')[1].split('_')[-1])
+						sim_num = int(summ_name.split('/')[0])
+						accept_summ_name = str(sim_num) + '/special_summary/accept_ratio_ordered_' + str(replica_id)
+					except ValueError:
+						print(summ_name)
+						print(summ_name.split('/')[0])
+						print(summ_name.split('/')[1].split('_')[-1])
+						raise
+
+					last_loss_val = self._se[e].get_summary(summ_name)[1][-1][0]
+					min_loss_val = self._se[e].get_summary(summ_name)[1].min()
+					accept_ratio_val = self._se[e].get_summary(accept_summ_name)[1][-1][0]
+					temp_factor = self._se[e].get_description()['temp_factor']
+
+					vals = [
+						experiment_name,
+						experiment_num,
+						sim_num,
+						n_replicas,
+						replica_id,
+						temp_factor,
+						beta_0,
+						swap_attempt_step,
+						surface_view,
+						last_loss_val,
+						min_loss_val,
+						accept_ratio_val
+					]
+					try:
+						self.df.loc[index] = vals
+					except ValueError:
+						print(len(cols), len(vals))
+						raise
+					index += 1
+
+		
+
+		return self.df
+
 
 
 	def _create_dataframe(self, matching_keywords):
@@ -283,6 +372,26 @@ class ExperimentExtractor(object):
 
 
 		return res 
+
+	def accept_ratio_per_replica_vs_best_loss_vs_tempfactor_data(self,
+		dataset_type='validation'):
+
+		dataset_type = ('valid' 
+			if dataset_type == 'validation' else dataset_type)
+
+		if dataset_type not in ['test', 'train', 'valid']:
+			raise ValueError("dataset_type must be only on of test/train/validation.")
+
+		accept_ratio = self.accept_ratio_per_replica_vs_tempfactor_data()
+		best_loss = self.best_crossentropy_per_ordered_replica_vs_tempfactor_data(
+			dataset_type)
+
+		# x==tempfactor, y==accept_ratio, z==best_loss
+		res = accept_ratio[0]
+		res['z'] = best_loss[0]['y']
+
+		return res
+
 
 
 
