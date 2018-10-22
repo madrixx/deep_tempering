@@ -86,6 +86,7 @@ class GraphBuilder(object):
 		self.__DEBUG__routes = [] # remove this !
 		self._cross_entropy_loss_dict = {}
 		self._zero_one_loss_dict = {}
+		self._stun_loss_dict = {}
 		self._optimizer_dict = {}
 		
 		# special vals for summary:
@@ -108,6 +109,9 @@ class GraphBuilder(object):
 					
 					self._zero_one_loss_dict[i] = self._zero_one_loss(self.y, 
 						logits_list[i])
+
+					self._stun_loss_dict[i] = self._stun_loss(
+						self._cross_entropy_loss_dict[i])
 
 				with tf.name_scope('Optimizer_' + str(i)):
 
@@ -133,13 +137,16 @@ class GraphBuilder(object):
 						optimizer.minimize(self._cross_entropy_loss_dict[i])
 					elif self._loss_func_name == 'zero_one_loss':
 						optimizer.minimize(self._zero_one_loss_dict[i])
+					elif self._loss_func_name == 'stun':
+						optimizer.minimize(self._stun_loss_dict[i])
 					else:
 						raise ValueError('Invalid loss function name. ',
-							'Available functions are: cross_entropy/zero_one_loss,',
+							'Available functions are: cross_entropy/zero_one_loss/stun,',
 							'But given:', self._loss_func_name)
 			
 			self._summary = Summary(self._graph, self._n_replicas, self._name, 
-				self._cross_entropy_loss_dict, self._zero_one_loss_dict, self._noise_list, 
+				self._cross_entropy_loss_dict, self._zero_one_loss_dict, 
+				self._stun_loss_dict, self._noise_list, 
 				self._noise_plcholders, simulation_num, 
 				self._optimizer_dict, summary_type=self._summary_type)
 
@@ -213,15 +220,16 @@ class GraphBuilder(object):
 
 		loss = [self._cross_entropy_loss_dict[i] for i in range(self._n_replicas)]
 		zero_one_loss = [self._zero_one_loss_dict[i] for i in range(self._n_replicas)]
+		stun_loss = [self._stun_loss_dict[i] for i in range(self._n_replicas)]
 		summary = self._summary.get_summary_ops(dataset_type)
 
 		if dataset_type == 'test' or dataset_type == 'validation':
-			return loss + zero_one_loss + summary
+			return loss + zero_one_loss + stun_loss + summary
 		elif dataset_type == 'train':
 			train_op = [self._optimizer_dict[i].get_train_op() 
 				for i in range(self._n_replicas)]
 			#if __DEBUG__: train_op = train_op + self.__DEBUG__logits_list
-			return loss + zero_one_loss + summary + train_op
+			return loss + zero_one_loss + stun_loss + summary + train_op
 		else:
 			raise InvalidDatasetTypeError()
 
@@ -237,13 +245,16 @@ class GraphBuilder(object):
 		elif tensor_type == 'zero_one_loss':
 			return evaluated[self._n_replicas:2*self._n_replicas]
 
+		elif tensor_type == 'stun':
+			return evaluated[2*self._n_replicas:3*self._n_replicas]
+
 		elif tensor_type == 'summary':
-			end_mult = (4 if self._summary_type is None else 3)
+			end_mult = (5 if self._summary_type is None else 4)
 			if len(evaluated) % self._n_replicas == 0:
-				return evaluated[2*self._n_replicas:end_mult*self._n_replicas]
+				return evaluated[3*self._n_replicas:end_mult*self._n_replicas]
 			else:
 				# special summary case
-				return evaluated[2*self._n_replicas:end_mult*self._n_replicas + 1]
+				return evaluated[3*self._n_replicas:end_mult*self._n_replicas + 1]
 		else:
 			raise InvalidLossFuncError() 
 
@@ -372,6 +383,13 @@ class GraphBuilder(object):
 				zero_one_loss = 1.0 - tf.reduce_mean(tf.cast(x=y_pred, dtype=tf.float32), 
 					name='zero_one_loss')
 		return zero_one_loss
+
+	def _stun_loss(self, cross_entropy, gamma=0.9):
+		with tf.name_scope('stun'):
+			with tf.device('/cpu:0'):
+				stun = 1 - tf.exp(-gamma*cross_entropy)
+
+		return stun
 
 
 	

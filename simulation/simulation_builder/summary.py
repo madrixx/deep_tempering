@@ -9,14 +9,16 @@ def sort_py_func(a):
     return a[a[:,0].argsort()]
 
 class Summary(object):
-	def __init__(self, graph, n_replicas, name, loss_dict, zero_one_loss_dict, noise_list, 
-		noise_plcholders, simulation_num, optimizer_dict, summary_type=None):
+	def __init__(self, graph, n_replicas, name, loss_dict, zero_one_loss_dict, 
+		stun_loss_dict, noise_list, noise_plcholders, simulation_num, 
+		optimizer_dict, summary_type=None):
 
 		self.graph = graph
 		self.n_replicas = n_replicas
 		self.name = name
 		self.loss_dict = loss_dict
 		self.zero_one_loss_dict = zero_one_loss_dict
+		self.stun_loss_dict = stun_loss_dict
 		self.noise_list = noise_list
 		self.noise_plcholders = noise_plcholders
 		self.optimizer_dict = optimizer_dict # diffusion summary 
@@ -156,6 +158,9 @@ class Summary(object):
 				
 				tf.summary.scalar('zero_one_loss', self.zero_one_loss_dict[i], 
 					collections=train_collect+test_collect+valid_collect)
+
+				tf.summary.scalar('stun', self.stun_loss_dict[i],
+					collections=train_collect+test_collect+valid_collect)
 				
 				tf.summary.scalar('noise', self.noise_plcholders[i],
 					collections=train_collect)
@@ -180,10 +185,11 @@ class Summary(object):
 	def create_ordered_summary(self, ):
 		loss = self.loss_dict
 		acc = self.zero_one_loss_dict
+		stun = self.stun_loss_dict
 		noise = self.noise_plcholders
 		
 		# sort using python function
-		list_ = [(loss[i], acc[i], noise[i]) 
+		list_ = [(loss[i], acc[i], stun[i], noise[i]) 
 			for i in range(self.n_replicas)]
 
 		sorted_ = tf.py_func(sort_py_func, [list_], tf.float32, 
@@ -194,12 +200,17 @@ class Summary(object):
 			test_collect = ['test'+str(i+self.n_replicas)]
 			valid_collect = ['validation'+str(i+self.n_replicas)]
 			with tf.name_scope('ordered_summary_' + str(i)):
+
 				tf.summary.scalar('cross_entropy', sorted_[i][0], 
 					collections=train_collect+test_collect+valid_collect)
+
 				tf.summary.scalar('zero_one_loss', sorted_[i][1], 
 					collections=train_collect+test_collect+valid_collect)
-				
-				tf.summary.scalar('noise', sorted_[i][2],
+
+				tf.summary.scalar('stun', sorted_[i][2],
+					collections=train_collect+test_collect+valid_collect)
+
+				tf.summary.scalar('noise', sorted_[i][3],
 					collections=train_collect)
 
 			self.train_summ_ordered[i] = tf.summary.merge_all(train_collect[0])

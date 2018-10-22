@@ -143,7 +143,7 @@ class Simulator(object):
 								evaluated = sess.run(g.get_train_ops('test'),
 									feed_dict=test_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='test')
-								loss = g.extract_evaluated_tensors(evaluated, 'cross_entropy')
+								loss = g.extract_evaluated_tensors(evaluated, self.loss_func_name)
 								
 								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
 								
