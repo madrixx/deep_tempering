@@ -440,8 +440,9 @@ def extract_and_remove_simulation(path):
 
 def generate_experiment_name(architecture=None, dataset='mnist', 
 	tuning_param_name=None, optimizer='PTLD', do_swaps=True, 
-	swap_proba='boltzmann', n_replicas=None, surface_view='energy', starting_beta=None, loss_func='crossentropy', 
-	swap_attempt_step=None, version='v3'):
+	swap_proba='boltzmann', n_replicas=None, surface_view='energy', starting_beta=None, 
+	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
+	version='v3'):
 	
 	
 	"""Experiment name:
@@ -450,8 +451,7 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 	<n_replicas>_<surface view>_<starting_beta_>
 
 		version: 'v2' means that summary stores diffusion value
-		version: 'v3' means added burn-in period of 33% of all
-			steps
+		version: 'v3' means added burn-in period 
 	"""
 
 
@@ -464,14 +464,16 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 		or (n_replicas is None)
 		or (surface_view is None or surface_view not in ['energy', 'info'])
 		or (starting_beta is None)
-		or (loss_func is None or loss_func not in ['crossentropy', 'zerooneloss'])
-		or (swap_attempt_step is None )):
+		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
+		or (swap_attempt_step is None )
+		or (burn_in_period is None)):
 		raise InvalidExperimentValueError()
 
 	name = architecture + '_' + dataset + '_'
 	name = name + tuning_param_name + '_' + optimizer + '_'
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(starting_beta) + '_' 
-	name = name + loss_func + '_' + str(swap_attempt_step) + '_' + version
+	name = name + loss_func + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
+	name = name + version
 
 	return name 
