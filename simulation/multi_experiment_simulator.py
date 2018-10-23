@@ -14,12 +14,13 @@ class MultiExperimentSimulator(object):
 		self.n_experiments = len(tuning_parameter_vals)
 
 		self.experiment_name = generate_experiment_name(
-			architecture=architecture_name, dataset=dataset_name, 
-			tuning_param_name=tuning_param_name, optimizer=optimizer_name,
+			architecture_name=architecture_name, dataset=dataset_name, 
+			temp_ratio=tuning_param_name, optimizer=optimizer_name,
 			do_swaps=do_swaps, swap_proba='boltzmann', n_replicas=n_replicas,
-			surface_view=surface_view, starting_beta=beta_0, 
-			loss_func_name=loss_func_name, swap_attempt_step=swap_attempt_step,
-			burn_in_period=burn_in_period, learning_rate=learning_rate)
+			surface_view=surface_view, beta_0=beta_0, 
+			loss_func_name=loss_func_name.replace('_',''), 
+			swap_attempt_step=swap_attempt_step, burn_in_period=burn_in_period, 
+			learning_rate=learning_rate)
 
 		self.architecture = architecture
 		self.tuning_parameter_vals = tuning_parameter_vals
