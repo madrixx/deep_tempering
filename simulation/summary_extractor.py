@@ -6,6 +6,9 @@ from tensorboard.backend.event_processing import event_accumulator
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
+import matplotlib.ticker as ticker
+from scipy.interpolate import spline
+
 import json
 import pickle
 import pandas as pd
@@ -510,8 +513,15 @@ class SummaryExtractor(object):
 				self._create_experiment_averages()
 
 				break
+	def _set_ticks(self, ax, vals=None):
+		x, y = self.get_summary('0/train_ordered_0/cross_entropy')
+		last_step = int(x[-1][0]) + 100
+		vals = vals if vals is not None else range(0, last_step, int(last_step/14))
 
-	def plot_diffusion(self, add_swap_marks=False, N=0):
+		ax.set_xticks([round(v, -3) for v in vals])
+
+
+	def plot_diffusion(self, add_swap_marks=False, N=0, title='diffusion'):
 		#N = number of simulation to show
 		n_col = 0
 		keys = 'diffusion'
@@ -529,16 +539,23 @@ class SummaryExtractor(object):
 				x, y = self.get_summary(s)
 				ax.plot(x, y, label=s)
 				n_col += 1
-				
+		js = self.get_description()
 		box = ax.get_position()
 		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
 		ax.legend(loc='center right', fancybox=True, shadow=True, 
-			bbox_to_anchor=(1.6, 0.5))
+			bbox_to_anchor=(1.2, 0.5))
+		ax.title.set_text(title)
+		if int(self.get_description()['n_epochs']) > 15:
+			self._set_ticks(ax)
+		
+		
+		#print(ax.get_xticks())
 
 		if add_swap_marks:
 			summ_name = str(N) + '/special_summary/swapped_replica_pair'
 			js = self.get_description()
 			step = js['swap_attempt_step']
+			burn_in_period = int(js['burn_in_period'])
 			#s = self.list_available_summaries()[0]
 			x, y = self.get_summary(summ_name)
 
@@ -546,9 +563,14 @@ class SummaryExtractor(object):
 			cnt = 0
 			for i in range(0, len_, step):
 				#print(x[int(i/len_)], int(i/len_), i, len_)
-				if y[cnt+1][0] != -1:
-					ax.axvline(x=i, linewidth=0.9, linestyle=':')
+				try:
+					if y[cnt][0] != -1 and x[cnt][0]> burn_in_period:
+						ax.axvline(x=i, linewidth=0.9, linestyle=':')
+				except:
+					print(cnt, y.shape, x.shape, summ_name)
+					continue
 				cnt += 1
+		fig.set_size_inches(12, 4.5) # (width, height)
 		return fig
 
 
@@ -572,31 +594,60 @@ class SummaryExtractor(object):
 		return sorted(set([k for k in self.all_summs_dict.keys()]))
 		
 
-	def plot(self, keys=['valid'], match=None, add_swap_marks=False):
+	def plot(self, keys=['valid'], match=None, add_swap_marks=False, title='', log_y=False):
 		n_col = 0
-
+		js = self.get_description()
 		fig, ax = plt.subplots()
 		for s in self.list_available_summaries():
 			summ_name = s.split('/') if match == 'exact' else s
 			if all(x in summ_name for x in keys):
 				x, y = self.get_summary(s)
-				ax.plot(x, y, label=s)
+				#print(x.shape)
+				#x = np.reshape(x, len(x))
+				#y = np.reshape(y, len(y))
+				#print(x.shape)
+				if 'noise' in keys:
+					ax.plot(x, y, label=s)
+				else:
+					x = np.ndarray.flatten(x)
+					y = np.ndarray.flatten(y)
+
+					x_new = np.linspace(x.min(), x.max(), x.shape[0]*4)
+					y_new = spline(x, y, x_new)
+					ax.plot(x_new, y_new, label=s)
 				n_col += 1
 				
 		box = ax.get_position()
 		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
 		ax.legend(loc='center right', fancybox=True, shadow=True, 
-			bbox_to_anchor=(1.6, 0.5))
+			bbox_to_anchor=(1.2, 0.5))
+		ax.title.set_text(title)
+		if int(self.get_description()['n_epochs']) > 15:
+			self._set_ticks(ax)
+
+		if log_y:
+			ax.set_ylabel('log(beta)')
+		
+			
+		ax.set_xlabel('1 training step == ' + str(js['batch_size']) + ' samples')
+		#start, end = ax.get_xlim()
+		#ax.xaxis.set_ticks(np.arange(start, end, 1000))
 
 		if add_swap_marks:
-			js = self.get_description()
+			
 			step = js['swap_attempt_step']
 			s = self.list_available_summaries()[0]
 			x, y = self.get_summary(s)
 			len_ = int(x[-1][0])
 			for i in range(0, len_, step):
 				ax.axvline(x=i)
+		if log_y:
+			plt.yscale('log', basey=js['temp_factor'])
+
+		fig.set_size_inches(12, 4.5) # (width, height)
 		return fig
+
+
 
 	def get_description(self):
 		d = self._dir.delim
@@ -622,6 +673,44 @@ class SummaryExtractor(object):
 			arrays = [self.get_summary(str(i) + '/' + name, split=False)
 				for i in range(self.n_experiments)]
 			self.all_summs_dict['mean/' + name] = np.mean(np.array(arrays), axis=0)
+	def get_min_val(self, summ_name):
+		x, y = self.get_summary(summ_name)
+		return(x[y.argmin()][0], y.min()) 
+
+	def print_report(self):
+		print(self.get_description()['temp_factor'])
+		print('best accuracy on test dataset:',self.get_min_val('0/test_ordered_0/zero_one_loss'))
+
+		print()
+		print('cross entropy:')
+		print('min_cross_valid_train:', self.get_min_val('0/train_ordered_0/cross_entropy'))
+		print('min_cross_valid_test:', self.get_min_val('0/test_ordered_0/cross_entropy'))
+		print('min_cross_valid_validation:', self.get_min_val('0/valid_ordered_0/cross_entropy'))
+		print('stun:')
+		print('min_stun_train:', self.get_min_val('0/train_ordered_0/stun'))
+		print('min_stun_test:', self.get_min_val('0/test_ordered_0/stun'))
+		print('min_stun_validation:', self.get_min_val('0/valid_ordered_0/stun'))
+		print()
+		print('accept_ratio:', self.get_summary('0/special_summary/accept_ratio')[1][-1][0])
+
+		fig = self.plot_diffusion(add_swap_marks=True)
+
+		fig = self.plot(['noise', 'replica', 'mean'], 
+			title='mixing between replicas', 
+			log_y=True)
+
+		fig = self.plot(['accept', 'ratio', 'replica', 'mean'], title='accept_ratio')
+
+		fig = self.plot(['cross', 'entropy', 'ordered', 'mean', 'test'], 
+			title='cross entropy for test dataset')
+
+		fig = self.plot(['stun', 'ordered', 'mean', 'test'], 
+			title='STUN loss for test dataset')
+
+		fig = self.plot(['zero', 'one', 'loss', 'mean', 'test', 'ordered'], 
+			title='0-1 loss for test dataset')
+
+
 
 
 def extract_summary(log_dir, delim="/"):
@@ -637,6 +726,7 @@ def extract_summary(log_dir, delim="/"):
 		vals are numpy arrays of tuples (step, value)
 
 	"""	
+
 
 	delim ="\\" if 'win' in sys.platform else '/'
 	

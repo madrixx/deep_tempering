@@ -47,7 +47,7 @@ class InvalidExperimentValueError(Exception):
 
 	def __init__(self, ):
 		msg = 'Invalid value of a parameter. Valid parameters are: \n'
-		msg = msg + "architecture: 'nn' or 'cnn' \n"
+		msg = msg + "architecture_name: 'nn' or 'cnn' \n"
 		msg = msg + "dataset: 'mnist' or 'cifar' \n"
 		msg = msg + "tuning_param_name: 'swapstep' or 'tempfactor' \n"
 		msg = msg + "optimizer: 'PTLD' \n"
@@ -55,10 +55,11 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "swap_proba: boltzamann or MAYBE add more (TODO)\n"
 		msg = msg + "n_replicas: int or str \n"
 		msg = msg + "surface_view: 'energy' or 'info' \n"
-		msg = msg + "starting_beta: int or str \n"
+		msg = msg + "beta_0: int or str \n"
 		msg = msg + "loss_func_name: 'crossentropy' or 'zerooneloss' \n"
 		msg = msg + "swap_attempt_step: int or str \n"
-		msg = msg + "burn_in_period: int"
+		msg = msg + "burn_in_period: int or float\n"
+		msg = msg + "learning_rate: float"
 		self.msg = msg
 
 	def __str__(self):

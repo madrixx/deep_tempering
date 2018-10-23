@@ -397,6 +397,7 @@ def extract_summary(log_dir, delim="/"):
 		
 		with open(dst_description_file, 'w') as fo:
 			json.dump(js, fo, indent=4)
+			
 
 	if os.path.exists(summary_filename):
 
@@ -438,11 +439,11 @@ def extract_and_remove_simulation(path):
 	se._dir.clean_dirs()
 
 
-def generate_experiment_name(architecture=None, dataset='mnist', 
-	tuning_param_name=None, optimizer='PTLD', do_swaps=True, 
-	swap_proba='boltzmann', n_replicas=None, surface_view='energy', starting_beta=None, 
+def generate_experiment_name(architecture_name=None, dataset='mnist', 
+	temp_ratio=None, optimizer='PTLD', do_swaps=True, 
+	swap_proba='boltzmann', n_replicas=None, surface_view='energy', beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
-	version='v3'):
+	learning_rate=None, version='v4'):
 	
 	
 	"""Experiment name:
@@ -452,28 +453,30 @@ def generate_experiment_name(architecture=None, dataset='mnist',
 
 		version: 'v2' means that summary stores diffusion value
 		version: 'v3' means added burn-in period 
+		version: 'v4' learning_rate has been added
 	"""
 
 
-	if ((architecture is None or architecture not in ['cnn', 'nn']) 
+	if ((architecture_name is None or architecture_name not in ['cnn', 'nn']) 
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
-		or (tuning_param_name is None or tuning_param_name not in ['tempfactor', 'swapstep']) 
+		or (temp_ratio is None) 
 		or (optimizer is None or optimizer not in ['PTLD'])
 		or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
 		or (swap_proba is None or swap_proba not in ['boltzmann'])
 		or (n_replicas is None)
 		or (surface_view is None or surface_view not in ['energy', 'info'])
-		or (starting_beta is None)
+		or (beta_0 is None)
 		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
 		or (swap_attempt_step is None )
-		or (burn_in_period is None)):
+		or (burn_in_period is None)
+		or (learning_rate is None)):
 		raise InvalidExperimentValueError()
 
-	name = architecture + '_' + dataset + '_'
-	name = name + tuning_param_name + '_' + optimizer + '_'
+	name = architecture_name + '_' + dataset + '_'
+	name = name + str(temp_ratio) + '_' + optimizer + '_'
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
-	name = name + surface_view + '_' + str(starting_beta) + '_' 
-	name = name + loss_func + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
-	name = name + version
+	name = name + surface_view + '_' + str(beta_0) + '_' 
+	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
+	name = name + str(learning_rate) + '_' + version
 
 	return name 

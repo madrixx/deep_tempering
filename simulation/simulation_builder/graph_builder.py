@@ -304,7 +304,7 @@ class GraphBuilder(object):
 		i = beta_id[random_pair][1]
 		j = beta_id[random_pair+1][1]
 	
-		loss_list = self.extract_evaluated_tensors(evaluated, 'cross_entropy')
+		loss_list = self.extract_evaluated_tensors(evaluated, self._loss_func_name)
 
 		#losses_and_ids = [(l, x) for x, l in enumerate(loss_list)]
 		#losses_and_ids.sort(key=lambda x: x[0])
@@ -319,10 +319,12 @@ class GraphBuilder(object):
 		self.ordered_n_swap_attempts[sorted_i] += 1
 		self.ordered_n_swap_attempts[sorted_j] += 1
 
-		if self._surface_view == 'information':
+		if self._surface_view == 'information' or self._surface_view == 'info':
 			l1, l2 = loss_list[i]/beta[i], loss_list[j]/beta[j]
-		else:
+		elif self._surface_view == 'energy':
 			l1, l2 = loss_list[i], loss_list[j] # energy
+		else:
+			raise ValueError('Invalid surface view.')
 		
 		accept_proba = np.exp((l1-l2)*(beta[i] - beta[j]))
 		self.latest_accept_proba = accept_proba
@@ -384,7 +386,7 @@ class GraphBuilder(object):
 					name='zero_one_loss')
 		return zero_one_loss
 
-	def _stun_loss(self, cross_entropy, gamma=0.9):
+	def _stun_loss(self, cross_entropy, gamma=1):
 		with tf.name_scope('stun'):
 			with tf.device('/cpu:0'):
 				stun = 1 - tf.exp(-gamma*cross_entropy)

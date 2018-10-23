@@ -19,7 +19,7 @@ class MultiExperimentSimulator(object):
 			do_swaps=do_swaps, swap_proba='boltzmann', n_replicas=n_replicas,
 			surface_view=surface_view, starting_beta=beta_0, 
 			loss_func_name=loss_func_name, swap_attempt_step=swap_attempt_step,
-			burn_in_period=burn_in_period)
+			burn_in_period=burn_in_period, learning_rate=learning_rate)
 
 		self.architecture = architecture
 		self.tuning_parameter_vals = tuning_parameter_vals

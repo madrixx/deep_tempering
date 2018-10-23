@@ -4,7 +4,7 @@ import gc
 
 import tensorflow as tf
 import json
-import sys
+import numpy as np
 
 from simulation.simulation_builder.graph_builder import GraphBuilder
 from simulation.simulation_builder.summary import Dir
@@ -38,9 +38,8 @@ class Simulator(object):
 		loss_func_name='cross_entropy', 
 		surface_view='information', description=None):
 		
-		if n_simulations == 1:
-			self.graph = GraphBuilder(architecture, learning_rate, noise_list, 
-				name, noise_type, summary_type, loss_func_name=loss_func_name)
+		
+			
 		
 		self.architecture = architecture
 		self.learning_rate = learning_rate
@@ -66,6 +65,12 @@ class Simulator(object):
 		self._dir = Dir(name)
 		if description:
 			self._log_params(description)
+
+		if n_simulations == 1:
+			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
+				self.noise_list, self.name, self.noise_type, 
+				self.summary_type, simulation_num=0, surface_view=self.surface_view,
+				loss_func_name=self.loss_func_name)
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
@@ -208,7 +213,10 @@ class Simulator(object):
 				g.swap_replicas(evaluated)
 				g._summary.flush_summary_writer()
 				"""
-				
+				valid_summary_step = (self.swap_attempt_step 
+					if self.swap_attempt_step >= self.test_step else np.ceil(self.test_step/self.swap_attempt_step))
+
+								
 				for epoch in range(self.n_epochs):
 					
 					while True:
@@ -228,7 +236,7 @@ class Simulator(object):
 								evaluated = sess.run(g.get_train_ops('test'),
 									feed_dict=test_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='test')
-								loss = g.extract_evaluated_tensors(evaluated, 'cross_entropy')
+								loss = g.extract_evaluated_tensors(evaluated, self.loss_func_name)
 								
 								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
 								
@@ -239,7 +247,9 @@ class Simulator(object):
 									valid_data, valid_labels, 'validation')
 								evaluated = sess.run(g.get_train_ops('validation'),
 									feed_dict=valid_feed_dict)
+								
 								g.add_summary(evaluated, step, dataset_type='validation')
+								#valid_inc = (valid_inc + 1) % valid_summary_step
 								if step > self.burn_in_period:
 									g.swap_replicas(evaluated)
 								else:
