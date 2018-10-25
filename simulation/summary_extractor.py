@@ -8,15 +8,17 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import matplotlib.ticker as ticker
 from scipy.interpolate import spline
+from scipy.special import erfcinv
 
 import json
 import pickle
 import pandas as pd
 import re
+from operator import itemgetter
 
 from simulation.simulation_builder.summary import Dir
 from simulation.simulator_exceptions import InvalidExperimentValueError
-
+from math import isinf
 
 class ExperimentPlot(object):
 
@@ -26,6 +28,136 @@ class ExperimentPlot(object):
 	def __str__(self):
 		return ', '.join(list(self._ee))
 
+	def _plot(self, x, y, ax, fig, title='', label='', log_x=False,
+		xlabel='', ylabel='', ylim_top=None, ylim_bottom=None):
+		def max_(array):
+			l = [a for a in array if isinf(a)==False]
+			return max(l)
+		
+		box = ax.get_position()
+		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
+		ax.legend(loc='center right', fancybox=True, shadow=True, 
+			bbox_to_anchor=(1.2, 0.5))
+		ax.title.set_text(title)
+		x_ = [e  if isinf(e)==False else max_(x) + max_(x)*(1/2)
+			for e in x]
+		y_ = [e if isinf(e)==False else max_(y) + max_(y)*(1/2)
+			for e in y]	
+
+		print(sum(y_)/len(y_))
+
+
+		#print([isinf(e) for e in y], max(y))
+		#print([_ for _ in map(isinf, y)])	
+		#print(x_)
+		#print()
+		#print(y_)
+		
+		x = np.array(x_)
+		y = np.array(y_)
+
+		x_new = np.linspace(x.min(), x.max(), x.shape[0]*6)
+		y_new = spline(x, y, x_new)
+		ax.plot(x_new, y_new, label=label)
+		
+
+		if log_x:
+	
+			plt.xscale('log', basex=4)
+
+		
+		ax.title.set_text(title)
+		ax.set_xlabel(xlabel)
+		ax.set_ylabel(ylabel)
+		#ax.set_xlabel('1 training step == ' + str(js['batch_size']) + ' samples')
+		#start, end = ax.get_xlim()
+		#ax.xaxis.set_ticks(np.arange(start, end, 1000))
+
+
+		fig.set_size_inches(12, 4.5) # (width, height)
+		return fig
+
+
+	def plot_heat_capacity_vs_temperature(self, 
+		custom_text = '', markeredgewidth=0.05, 
+		elinewidth=0.5, set_ylim=None, set_xlim=None,
+		log_x=False):
+
+		
+		figs = []
+		
+		
+		if set_ylim:
+			ax.set_ylim(top=set_ylim)
+		if set_xlim:
+			ax.set_xlim(right=set_xlim)
+
+		for k in self._ee:
+			res = self._ee[k].heat_capacity_accuracy_betas_temperature_data()
+			acc_ratios, heat_capacities, betas, temperatures = res
+			
+
+
+			# temperature vs heat capacity
+			x, y, = zip(*sorted(zip(temperatures, heat_capacities)))
+
+			
+			#return self._plot(x, y, ax, fig, 'temperature vs heat capacity')
+			fig, ax = plt.subplots()
+			#text = 'Heat capacity vs temperature. \n'
+			#ax.title.set_text(text + custom_text)
+			figs.append(self._plot(list(x), 
+				list(y), 
+				ax, 
+				fig, 
+				title='temperature vs heat capacity',
+				xlabel='Temperature',
+				ylabel='Heat Capacity',
+				log_x=log_x))
+			
+
+
+			# accept ratio vs temperature
+			x, y = zip(*sorted(zip(temperatures, acc_ratios)))
+			fig, ax = plt.subplots()
+			figs.append(self._plot(list(x), 
+				list(y), 
+				ax, 
+				fig, 
+				title='temperature vs accept ratio',
+				xlabel='Temperature',
+				ylabel='acceptance ratio',
+				log_x=log_x))
+			
+			# beta vs heat capacity
+			x, y = zip(*sorted(zip(betas, heat_capacities)))
+			fig, ax = plt.subplots()
+			figs.append(self._plot(list(x), 
+				list(y), 
+				ax, 
+				fig, 
+				title='beta vs heat_capacities',
+				xlabel='Beta',
+				ylabel='heat capacity',
+				log_x=log_x))
+
+			# beta vs accept ratio
+			x, y = zip(*sorted(zip(betas, acc_ratios)))
+			fig, ax = plt.subplots()
+			figs.append(self._plot(list(x), 
+				list(y), 
+				ax, 
+				fig, 
+				title='beta vs accept ratio',
+				xlabel='Beta',
+				ylabel='acceptance ratio',
+				log_x=log_x))
+
+
+			
+		
+		
+		return figs
 
 
 	def plot_final_crossentropy_per_ordered_replica_vs_tempfactor(self, 
@@ -122,8 +254,9 @@ class ExperimentExtractor(object):
 	def __init__(self, experiment_names):
 		names = list(set(['_'.join(e.split('_')[:-1])
 			for e in experiment_names]))
-		if len(names) > 1:
+		if (len(names) > 1) and ('beta0' not in names[0]):
 			#print(names)
+
 			raise ValueError('Simulations must be from the same experiments, but given:',
 				names)
 		self._name = names[0]
@@ -299,6 +432,8 @@ class ExperimentExtractor(object):
 				index += 1
 		return df
 
+
+
 	def best_crossentropy_per_ordered_replica_vs_tempfactor_data(self,
 		dataset_type='validation'):
 		dataset_type = ('valid' 
@@ -341,6 +476,36 @@ class ExperimentExtractor(object):
 
 
 		return res 
+
+	def heat_capacity_accuracy_betas_temperature_data(self, ):
+
+		def erfcinv_beta_ratio(accept_ratio, inv_beta_ratio):
+			return (erfcinv(accept_ratio)*(1+inv_beta_ratio)/(1-inv_beta_ratio))**2
+
+		
+		acc_ratios = []
+		betas = []
+		temperatures = []
+		heat_capacities = []
+		for k in self._se:
+			se = self._se[k]
+			js = se.get_description()
+			accs = []
+			for s in range(js['n_simulations']):
+				x, y = se.get_summary(str(s)+'/special_summary/accept_ratio')
+				acc = y[-1][0]
+				accs.append(acc)
+			acc = sum(accs)/len(accs)
+			invratio = 1/se.get_description()['temp_factor']
+			noise = se.get_description()['noise_list']
+			hcap = erfcinv_beta_ratio(acc, invratio)
+			heat_capacities.append(hcap)
+			acc_ratios.append(float(acc))
+			betas.append(sum(noise)/len(noise))
+			temperatures.append(1/betas[-1])
+		#print(temperatures)
+		return acc_ratios, heat_capacities, betas, temperatures
+
 
 	def accept_ratio_per_replica_vs_tempfactor_data(self):
 		df = self._create_dataframe(['accept', 'ratio', 'replica'])
@@ -585,10 +750,14 @@ class SummaryExtractor(object):
 		Returns:
 			(x, y) numpy array
 		"""
-		if split:
-			return np.hsplit(self.all_summs_dict[summ_name], 2)
-		else:
-			return self.all_summs_dict[summ_name]
+		try:
+			if split:
+				return np.hsplit(self.all_summs_dict[summ_name], 2)
+			else:
+				return self.all_summs_dict[summ_name]
+		except KeyError:
+			print(self._dir.name)
+			raise
 
 	def list_available_summaries(self):
 		return sorted(set([k for k in self.all_summs_dict.keys()]))

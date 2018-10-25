@@ -88,6 +88,24 @@ class Simulator(object):
 			gc.collect()
 		
 		[s_utils.extract_and_remove_simulation(n) for n in sim_names]
+
+	def explore_heat_capacity(self, train_func, betas, *args, **kwargs):
+		"""Used for exploring heat capacity function."""
+
+		sim_names = []
+		i = 0
+		for beta_0 in betas:
+			noise_list = [beta_0, temp_factor*beta_0]
+			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
+				noise_list, self.name, self.noise_type, 
+				self.summary_type, simulation_num=i, surface_view=self.surface_view,
+				loss_func_name=self.loss_func_name)
+			
+			sim_names.append(self.graph._summary.dir.name)
+			train_func(kwargs)
+			gc.collect()
+			i += 1
+
 	
 	def train_PTLD(self, kwargs):
 	
@@ -175,7 +193,8 @@ class Simulator(object):
 				g._summary.close_summary_writer()
 
 	def train(self, **kwargs):
-	
+		self.train_PTLD(kwargs)
+		"""
 		try:
 			g = self.graph
 			train_data = kwargs.get('train_data', None)
@@ -203,16 +222,16 @@ class Simulator(object):
 				sess.run(iterator.initializer)
 				sess.run(g.variable_initializer)
 				next_batch = iterator.get_next()
-				"""
+				
 				# validation first time
-				valid_feed_dict = g.create_feed_dict(
-					valid_data, valid_labels, 'validation')
-				evaluated = sess.run(g.get_train_ops('validation'),
-					feed_dict=valid_feed_dict)
-				g.add_summary(evaluated, step, dataset_type='validation')
-				g.swap_replicas(evaluated)
-				g._summary.flush_summary_writer()
-				"""
+				#valid_feed_dict = g.create_feed_dict(
+				#	valid_data, valid_labels, 'validation')
+				#evaluated = sess.run(g.get_train_ops('validation'),
+				#	feed_dict=valid_feed_dict)
+				#g.add_summary(evaluated, step, dataset_type='validation')
+				#g.swap_replicas(evaluated)
+				#g._summary.flush_summary_writer()
+				
 				valid_summary_step = (self.swap_attempt_step 
 					if self.swap_attempt_step >= self.test_step else np.ceil(self.test_step/self.swap_attempt_step))
 
@@ -262,6 +281,7 @@ class Simulator(object):
 
 				
 				g._summary.close_summary_writer()
+				"""
 
 	
 

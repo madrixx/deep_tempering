@@ -9,7 +9,8 @@ class MultiExperimentSimulator(object):
 		n_simulations=10, batch_size=50, n_epochs=25, swap_attempt_step=400, 
 		dataset_name='mnist', tuning_param_name='tempfactor', swap_proba='boltzmann',
 		optimizer_name='PTLD', loss_func_name='crossentropy', do_swaps=True, 
-		start_experiments_at=0, burn_in_period=None, description='v3', verbose=True):
+		start_experiments_at=0, burn_in_period=None,
+		temp_factor=None, description='v3', verbose=True):
 
 		self.n_experiments = len(tuning_parameter_vals)
 
@@ -46,11 +47,23 @@ class MultiExperimentSimulator(object):
 		self.start_experiments_at = start_experiments_at
 		self.burn_in_period = burn_in_period
 		self.loss_func_name = loss_func_name
+		self.temp_factor = temp_factor
 
 
 
 	def run_all(self):
+		if self.tuning_param_name.replace('_', '') == 'tempfactor':
+			self._run_tempfactor_experiments()
+		elif self.tuning_param_name == 'accept':
+			self._run_accept_experiments()
+
+	def _run_accept_experiments(self):
+		timer = Timer()
+		for exp in range(self.start_experiments_at, self.n_experiments):
+			name = self.experiment_name
 		
+
+	def _run_tempfactor_experiments(self):
 		timer = Timer()
 		for exp in range(self.start_experiments_at, self.n_experiments):
 			temp_factor = self.tuning_parameter_vals[exp]
@@ -82,7 +95,6 @@ class MultiExperimentSimulator(object):
 				)
 			if self.verbose: print()
 			if self.verbose: print('time took:', timer.elapsed_time(), 'min')
-
 
 
 
