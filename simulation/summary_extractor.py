@@ -813,7 +813,7 @@ class SummaryExtractor(object):
 		if log_y:
 			plt.yscale('log', basey=js['temp_factor'])
 
-		fig.set_size_inches(12, 4.5) # (width, height)
+		fig.set_size_inches(11, 4.5) # (width, height)
 		return fig
 
 

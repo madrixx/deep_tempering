@@ -16,7 +16,7 @@ class MultiExperimentSimulator(object):
 
 		self.experiment_name = generate_experiment_name(
 			architecture_name=architecture_name, dataset=dataset_name, 
-			temp_ratio=tuning_param_name, optimizer=optimizer_name,
+			temp_ratio=tuning_param_name.replace('_', ''), optimizer=optimizer_name,
 			do_swaps=do_swaps, swap_proba='boltzmann', n_replicas=n_replicas,
 			surface_view=surface_view, beta_0=beta_0, 
 			loss_func_name=loss_func_name.replace('_',''), 
@@ -51,16 +51,50 @@ class MultiExperimentSimulator(object):
 
 
 
-	def run_all(self):
+	def run_all(self, beta_0_list=None):
 		if self.tuning_param_name.replace('_', '') == 'tempfactor':
 			self._run_tempfactor_experiments()
-		elif self.tuning_param_name == 'accept':
-			self._run_accept_experiments()
+		elif self.tuning_param_name == 'beta0':
+			self._run_accept_experiments(beta_0_list)
 
-	def _run_accept_experiments(self):
+	def _run_accept_experiments(self, beta0_list):
+		separation_ratio = self.temp_factor
+		if beta0_list is None:
+			raise ValueError("beta0_list is None, but must contain beta_0 vals.")
+
 		timer = Timer()
-		for exp in range(self.start_experiments_at, self.n_experiments):
-			name = self.experiment_name
+		name = self.experiment_name
+		
+		for exp in range(self.start_experiments_at, len(beta0_list)):
+			beta0 = beta0_list[exp]
+			noise_list = [beta0, beta0*separation_ratio]
+			name = self.experiment_name + '_' + str(exp)
+			if self.verbose: print('experiment:', exp+1, '/', len(beta0_list), 
+				', separation_ratio:', separation_ratio)
+			if self.verbose: print(noise_list)
+
+			sim = Simulator(self.architecture, self.learning_rate,
+				noise_list, self.noise_type, batch_size=self.batch_size,
+				n_epochs=self.n_epochs, name=name, n_simulations=self.n_simulations,
+				swap_attempt_step=self.swap_attempt_step,
+				temp_factor=separation_ratio, 
+				tuning_parameter_name=self.tuning_param_name,
+				surface_view=self.surface_view, burn_in_period=self.burn_in_period,
+				loss_func_name=self.loss_func_name, description=self.description)
+
+			sim.train_n_times(sim.train_PTLD, train_data=self.data['train_data'],
+				train_labels=self.data['train_labels'], 
+				test_data=self.data['test_data'],
+				test_labels=self.data['test_labels'], 
+				validation_data=self.data['valid_data'], 
+				validation_labels=self.data['valid_labels']
+				)
+			if self.verbose: print()
+			if self.verbose: print('time took:', timer.elapsed_time(), 'min')
+
+			#exp += 1
+
+
 		
 
 	def _run_tempfactor_experiments(self):
@@ -95,6 +129,8 @@ class MultiExperimentSimulator(object):
 				)
 			if self.verbose: print()
 			if self.verbose: print('time took:', timer.elapsed_time(), 'min')
+
+
 
 
 
