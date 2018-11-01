@@ -21,7 +21,7 @@ class MultiExperimentSimulator(object):
 			surface_view=surface_view, beta_0=beta_0, 
 			loss_func_name=loss_func_name.replace('_',''), 
 			swap_attempt_step=swap_attempt_step, burn_in_period=burn_in_period, 
-			learning_rate=learning_rate)
+			learning_rate=learning_rate, n_epochs=n_epochs)
 
 		self.architecture = architecture
 		self.tuning_parameter_vals = tuning_parameter_vals

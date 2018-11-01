@@ -59,7 +59,8 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "loss_func_name: 'crossentropy' or 'zerooneloss' \n"
 		msg = msg + "swap_attempt_step: int or str \n"
 		msg = msg + "burn_in_period: int or float\n"
-		msg = msg + "learning_rate: float"
+		msg = msg + "learning_rate: float\n"
+		msg = msg + "n_epochs: int"
 		self.msg = msg
 
 	def __str__(self):

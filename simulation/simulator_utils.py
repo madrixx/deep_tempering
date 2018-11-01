@@ -443,7 +443,7 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	temp_ratio=None, optimizer='PTLD', do_swaps=True, 
 	swap_proba='boltzmann', n_replicas=None, surface_view='energy', beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
-	learning_rate=None, version='v4'):
+	learning_rate=None, n_epochs=None, version='v4'):
 	
 	
 	"""Experiment name:
@@ -454,6 +454,7 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		version: 'v2' means that summary stores diffusion value
 		version: 'v3' means added burn-in period 
 		version: 'v4' learning_rate has been added
+		version: 'v5' has n_epochs in it
 	"""
 
 
@@ -469,7 +470,8 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
 		or (swap_attempt_step is None )
 		or (burn_in_period is None)
-		or (learning_rate is None)):
+		or (learning_rate is None)
+		or (n_epochs is None)):
 		raise InvalidExperimentValueError()
 
 	name = architecture_name + '_' + dataset + '_'
@@ -477,6 +479,6 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(beta_0) + '_' 
 	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
-	name = name + str(learning_rate) + '_' + version
+	name = name + str(learning_rate) + '_' + str(n_epochs) + version
 
 	return name 

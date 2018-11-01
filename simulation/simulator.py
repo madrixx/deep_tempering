@@ -95,16 +95,17 @@ class Simulator(object):
 		sim_names = []
 		i = 0
 		for beta_0 in betas:
-			noise_list = [beta_0, temp_factor*beta_0]
-			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
-				noise_list, self.name, self.noise_type, 
-				self.summary_type, simulation_num=i, surface_view=self.surface_view,
-				loss_func_name=self.loss_func_name)
+			for j in range(self.n_simulations):
+				noise_list = [beta_0, temp_factor*beta_0]
+				self.graph = GraphBuilder(self.architecture, self.learning_rate, 
+					noise_list, self.name, self.noise_type, 
+					self.summary_type, simulation_num=i, surface_view=self.surface_view,
+					loss_func_name=self.loss_func_name)
 			
-			sim_names.append(self.graph._summary.dir.name)
-			train_func(kwargs)
-			gc.collect()
-			i += 1
+				sim_names.append(self.graph._summary.dir.name)
+				train_func(kwargs)
+				gc.collect()
+				i += 1
 
 	
 	def train_PTLD(self, kwargs):
@@ -295,6 +296,7 @@ class Simulator(object):
 			'name':self.name,
 			'noise_type': self.noise_type,
 			'noise_list': self.noise_list,
+			'n_replicas': len(self.noise_list),
 			'learning_rate':self.learning_rate,
 			'n_epochs':self.n_epochs,
 			'batch_size':self.batch_size,
