@@ -479,6 +479,6 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(beta_0) + '_' 
 	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
-	name = name + str(learning_rate) + '_' + str(n_epochs) + version
+	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + version
 
 	return name 
