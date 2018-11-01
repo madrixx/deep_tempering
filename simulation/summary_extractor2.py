@@ -72,9 +72,9 @@ class Plot(object):
 		if xlabel is not None: ax.set_xlabel(xlabel)
 		if ylabel is not None: ax.set_ylabel(ylabel)
 		if log_x is not None: plt.xscale('log', basex=log_x)
-		if log_y is not None: plt.yscale('log', basey=log_y)
-		
-		fig.set_size_inches(12, 4.5) # (width, height)
+		if log_y is not None: 
+		  plt.yscale('log', basey=log_y)        
+		fig.set_size_inches(12, 4.5)# (width, height)
 		self.__first_use = False
 
 	def plot(self, x, y, err=None, fig=None, ax=None, label=None, 
@@ -98,14 +98,12 @@ class Plot(object):
 
 
 
-		
-		
 
 		# check if there are infinity
 		x_ = [e  if isinf(e)==False else max_(x) + max_(x)*2
 			for e in x]
 		y_ = [e if isinf(e)==False else max_(y) + max_(y)*2
-			for e in y]	
+			for e in y] 
 
 		x = np.array(x_)
 		y = np.array(y_)
@@ -317,7 +315,24 @@ class SummaryExtractor(object):
 
 	def list_available_summaries(self):
 		return sorted(set([k for k in self.all_summs_dict.keys()]))
+	
+	def plot_mixing_between_replicas(self, dataset_type='train', simulation_num=0):
+		plot = Plot()
+		fig, ax = plt.subplots()
+
+
 		
+		for r in range(self._n_replicas):
+
+			x, y = self.get_summary()
+			plot.plot(x, y, fig=fig, ax=ax, 
+				simulation_num=simulation_num, replica_id=r)
+			plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
+				ylabel='NOISE VALUE', title='mixing between replicas',
+				log_y=self.get_description()['temp_factor'])
+
+		return fig
+
 
 	def plot(self, keys=['valid'], match=None, add_swap_marks=False, title='', log_y=False):
 		n_col = 0
@@ -420,9 +435,8 @@ class SummaryExtractor(object):
 
 		fig = self.plot_diffusion(add_swap_marks=True)
 
-		fig = self.plot(['noise', 'replica', 'mean'], 
-			title='mixing between replicas', 
-			log_y=True)
+		fig = self.plot_mixing_between_replicas()
+		
 
 		fig = self.plot(['accept', 'ratio', 'replica', 'mean'], title='accept_ratio')
 
@@ -447,7 +461,7 @@ def extract_summary(log_dir, delim="/"):
 		A dict where keys are names of the summary scalars and
 		vals are numpy arrays of tuples (step, value)
 
-	"""	
+	""" 
 
 
 	delim ="\\" if 'win' in sys.platform else '/'
