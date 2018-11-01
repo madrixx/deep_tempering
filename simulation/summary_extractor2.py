@@ -124,7 +124,7 @@ class Plot(object):
 			if err:
 				plot_func(x, y, yerr=err, label=label)
 			else:
-				plot_func(x, y, label)
+				plot_func(x, y, label=label)
 
 		
 
@@ -230,6 +230,24 @@ class SummaryExtractor(object):
 		fig.set_size_inches(12, 4.5) # (width, height)
 		return fig
 
+	def plot_mixing_between_replicas(self, dataset_type='train', simulation_num=0):
+		plot = Plot()
+		fig, ax = plt.subplots()
+
+
+		
+		for r in range(self._n_replicas):
+
+			x, y = self.get_summary('noise', ordered=False, dataset_type=dataset_type, 
+				simulation_num=simulation_num, replica_num=r)
+			plot.plot(x, y, fig=fig, ax=ax, label='replica_' + str(r), splined_points_mult=None)
+		plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
+			ylabel='NOISE VALUE', title='mixing between replicas',
+			log_y=self.get_description()['temp_factor'])
+
+		return fig
+
+
 
 
 	def get_summary(self, summ_name, dataset_type='test', ordered=True, simulation_num=0, replica_num=0):
@@ -262,8 +280,11 @@ class SummaryExtractor(object):
 			req_str = req_str + 'valid_'
 		elif dataset_type == 'test':
 			req_str = req_str + 'test_'
-		elif dataset_type == 'train_':
+		elif dataset_type == 'train':
 			req_str = req_str + 'train_'
+		else:
+			raise ValueError('Invalid dataset_type:', dataset_type)
+
 
 		if ordered:
 			req_str = req_str + 'ordered_'
@@ -271,6 +292,7 @@ class SummaryExtractor(object):
 			req_str = req_str + 'replica_'
 
 		req_str = req_str + str(replica_num) + '/'
+
 
 		if summ_name == 'cross_entropy':
 			req_str = req_str + 'cross_entropy'
@@ -316,23 +338,7 @@ class SummaryExtractor(object):
 	def list_available_summaries(self):
 		return sorted(set([k for k in self.all_summs_dict.keys()]))
 	
-	def plot_mixing_between_replicas(self, dataset_type='train', simulation_num=0):
-		plot = Plot()
-		fig, ax = plt.subplots()
-
-
-		
-		for r in range(self._n_replicas):
-
-			x, y = self.get_summary()
-			plot.plot(x, y, fig=fig, ax=ax, 
-				simulation_num=simulation_num, replica_id=r)
-			plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
-				ylabel='NOISE VALUE', title='mixing between replicas',
-				log_y=self.get_description()['temp_factor'])
-
-		return fig
-
+	
 
 	def plot(self, keys=['valid'], match=None, add_swap_marks=False, title='', log_y=False):
 		n_col = 0
