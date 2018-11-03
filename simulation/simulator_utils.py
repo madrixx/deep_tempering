@@ -443,7 +443,7 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	temp_ratio=None, optimizer='PTLD', do_swaps=True, 
 	swap_proba='boltzmann', n_replicas=None, surface_view='energy', beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
-	learning_rate=None, n_epochs=None, version='v4'):
+	learning_rate=None, n_epochs=None, version='v5'):
 	
 	
 	"""Experiment name:

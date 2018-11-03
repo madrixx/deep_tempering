@@ -155,6 +155,68 @@ class SummaryExtractor(object):
 		self._n_simulations = self.get_description()['n_simulations']
 		self._n_replicas = len(self.get_description()['noise_list'])
 
+	def _get_mixing_ratio_data(self):
+		"""Fraction of replicas that get visit both lowest and highest temperatures."""
+		reps = {"{0:.2f}".format(b):0 
+			for b in self.get_description()['noise_list']}
+		for s in range(self._n_simulations):
+			for r in range(self._n_replicas):
+				x, y = self.get_summary('noise', simulation_num=s,
+					replica_num=r, ordered=False, dataset_type='train')
+				n_steps = int(x.shape[0])
+
+				for i in range(n_steps):
+					if x[i] > self.get_description()['burn_in_period']:
+						reps["{0:.2f}".format(y[i])] += 1
+			return reps
+
+
+	def plot_temperature_occupation_rate(self):
+		reps = self._get_time_fraction_spent_at_each_temperature()
+		replicas = [0, 1, 2, 3, 4, 5, 6, 7]
+		bars = {}
+
+		for n in self.get_description()['noise_list']:
+			noise_val = "{0:.2f}".format(n)
+			bars[n] = 0
+
+		bars = {n:[reps[i][j] for i in range(self._n_replicas)
+			for j in self]}
+		
+
+
+	def _get_temperature_occupation_rate_data(self):
+		"""Returns dict[replica][noise_vals]=time_spen"""
+		"""MAYBE DELETE"""
+		reps = {i:{"{0:.2f}".format(j):0 for j in self.get_description()['noise_list']} 
+			for i in range(self._n_replicas)}
+		
+		for s in range(self._n_simulations):
+			for r in range(self._n_replicas):
+				for noise in self.get_description()['noise_list']:
+					x, y = self.get_summary('noise', simulation_num=s, 
+						replica_num=r, ordered=False, dataset_type='train')
+					#hist = {"{0:.3f}".format(j):0 for j in self.get_description()['noise_list']}
+					n_steps = int(x.shape[0])
+					#print(self.get_description()['noise_list'])
+					for i in range(n_steps):
+						if x[i] > self.get_description()['burn_in_period']:
+							try:
+								reps[r]["{0:.2f}".format(y[i])] += 1
+							except KeyError:
+								print(reps[r].keys())
+								raise
+							
+		"""
+		#total_steps = self._n_simulations * n_steps
+		for r in range(self._n_replicas):
+			total_steps = sum(reps[r].values())
+			for n in reps[r]:
+				reps[r][n] = reps[r][n] / total_steps
+		#print(total_steps)
+		"""
+		return reps
+
 	def get_accept_ratio_vs_separation_ratio_data(self):
 		"""Returns tuple (separation_ratio, accept_ratio, stddev)"""
 		reps = {i:[] for i in range(self._n_replicas)}
