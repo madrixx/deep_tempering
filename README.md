@@ -39,8 +39,8 @@ description='Test simulation!'
 
 # make sure that there are no directories that were previously created with same name
 # otherwise, there will be problems extracting simulated results
-s_utils.clean_dirs('simulation/summaries/' + simulation_name + '_0/')
-s_utils.clean_dirs('simulation/summaries/compressed/' + simulation_name + '_0/')
+s_utils.clean_dirs('simulation/summaries/' + simulation_name)
+s_utils.clean_dirs('simulation/summaries/compressed/' + simulation_name)
 
 # create and run simulation
 sim = Simulator(
@@ -106,8 +106,8 @@ description='Test2 simulation!'
 
 # make sure that there are no directories that were previously created with same name
 # otherwise, there will be problems extracting simulated results
-s_utils.clean_dirs('simulation/summaries/' + simulation_name + '_0/')
-s_utils.clean_dirs('simulation/summaries/compressed/' + simulation_name + '_0/')
+s_utils.clean_dirs('simulation/summaries/' + simulation_name)
+s_utils.clean_dirs('simulation/summaries/compressed/' + simulation_name)
 
 # create and run simulation
 sim = Simulator(
