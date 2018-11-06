@@ -47,7 +47,7 @@ class InvalidExperimentValueError(Exception):
 
 	def __init__(self, ):
 		msg = 'Invalid value of a parameter. Valid parameters are: \n'
-		msg = msg + "architecture_name: 'nn' or 'cnn' \n"
+		msg = msg + "architecture_name: 'nn/cnn' + \{ 075, 125...\} \n"
 		msg = msg + "dataset: 'mnist' or 'cifar' \n"
 		msg = msg + "tuning_param_name: 'swapstep' or 'tempfactor' \n"
 		msg = msg + "optimizer: 'PTLD' \n"

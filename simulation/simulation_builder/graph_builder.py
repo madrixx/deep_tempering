@@ -25,7 +25,7 @@ class GraphBuilder(object):
 
 	def __init__(self, architecture, learning_rate, noise_list, name, 
 		noise_type='random_normal', summary_type=None, simulation_num=None, 
-		surface_view='information', loss_func_name='cross_entropy'):
+		surface_view='energy', loss_func_name='cross_entropy'):
 		
 		self._architecture = architecture
 		self._learning_rate = learning_rate

@@ -9,6 +9,70 @@ import collections
 from tensorflow.python.client import device_lib
 from simulation.simulation_builder.device_placer import _gpu_device_name
 
+def nn_mnist_architecture_075(graph):
+	n_inputs = 28*28
+	n_hidden1 = int(300*0.75)
+	n_hidden2 = int(100*0.75)
+	n_outputs = 10
+	with graph.as_default():
+		with tf.name_scope('Inputs'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+			with tf.name_scope('y'):
+				y = tf.placeholder(tf.int64, shape=(None), name='y')
+		#with tf.name_scope('NN'):
+
+			
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden2,
+			n_outputs,
+			name='logits')
+	return X, y, logits
+
+def nn_mnist_architecture_125(graph):
+	n_inputs = 28*28
+	n_hidden1 = int(300*1.25)
+	n_hidden2 = int(100*1.25)
+	n_outputs = 10
+	with graph.as_default():
+		with tf.name_scope('Inputs'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+			with tf.name_scope('y'):
+				y = tf.placeholder(tf.int64, shape=(None), name='y')
+		#with tf.name_scope('NN'):
+
+			
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden2,
+			n_outputs,
+			name='logits')
+	return X, y, logits
+
 
 def nn_mnist_architecture(graph):
 	"""Creates architecture for NN mnist.

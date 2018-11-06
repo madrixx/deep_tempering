@@ -25,17 +25,25 @@ class ExperimentExtractor(object):
 	def __init__(self, experiment_names):
 		names = list(set(['_'.join(e.split('_')[:-1])
 			for e in experiment_names]))
-		if (len(names) > 1) and ('beta0' not in names[0]):
+		if (len(names) > 1) and (len(list(set(['_'.join(e.split('_')[:-1]) for e in names]))) > 1):
 
 			raise ValueError('Simulations must be from the same experiments, but given:',
 				names)
 
-		self._name = names[0]
+		try:
+			self._name = names[0]
+		except IndexError:
+			print(names)
+			print(experiment_names)
+			raise
 		self._se = {e:SummaryExtractor(e)
 			for e in experiment_names}
 
 	def __str__(self):
 		return self._name
+
+	def __repr__(self):
+		return self.__str__()
 
 	def get_accept_ratio_vs_separation_ratio_data(self):
 		"""Returns tuple of numpy arrays (separation_ratio, accept_ratio, stddev)"""
@@ -55,6 +63,21 @@ class ExperimentExtractor(object):
 
 		return list(x), list(y), list(err)
 
+	def get_mixing_ratio_vs_separation_ratio_data(self):
+		sep_ratio = []
+		mixing_ratio = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			mix, sep = se.get_mixing_ratio_vs_separation_ratio_data()
+			sep_ratio.append(sep)
+			mixing_ratio.append(mix)
+
+		x, y = zip(*sorted(zip(sep_ratio, mixing_ratio)))
+		
+		return list(x), list(y)
+
+
+
 
 class Plot(object):
 
@@ -63,7 +86,7 @@ class Plot(object):
 		
 	def legend(self, fig, ax, bbox_to_anchor=(1.2, 0.5),
 		legend_title='', xlabel=None, ylabel=None, title=None,
-		log_x=None, log_y=None,):
+		log_x=None, log_y=None):
 		box = ax.get_position()
 		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
 		ax.legend(loc='center right', fancybox=True, shadow=True, 
@@ -73,14 +96,15 @@ class Plot(object):
 		if ylabel is not None: ax.set_ylabel(ylabel)
 		if log_x is not None: plt.xscale('log', basex=log_x)
 		if log_y is not None: 
-		  plt.yscale('log', basey=log_y)        
+		  plt.yscale('log', basey=log_y) 
+
 		fig.set_size_inches(12, 4.5)# (width, height)
 		self.__first_use = False
 
 	def plot(self, x, y, err=None, fig=None, ax=None, label=None, 
 		ylim_top=None, ylim_bottom=None, 
 		splined_points_mult=6, elinewidth=0.5,
-		markeredgewidth=0.05, ):
+		markeredgewidth=0.05, fmt=None):
 
 		def max_(array):
 			#print(type(array))
@@ -118,13 +142,22 @@ class Plot(object):
 					label=label, elinewidth=elinewidth,
 					markeredgewidth=markeredgewidth)
 			else:
-				plot_func(x_new, y_new, label=label)
+				if fmt is None:
+					plot_func(x_new, y_new, label=label)
+				else:
+					plot_func(x_new, y_new, fmt, label=label)
 
 		else:
 			if err:
-				plot_func(x, y, yerr=err, label=label)
+				if fmt is None:
+					plot_func(x, y, yerr=err, label=label)
+				else:
+					plot_func(x, y, fmt, yerr=err, label=label)
 			else:
-				plot_func(x, y, label=label)
+				if fmt is None:
+					plot_func(x, y, label=label,)
+				else:
+					plot_func(x, y, fmt, label=label,)
 
 		
 
@@ -139,6 +172,7 @@ class SummaryExtractor(object):
 		self._dir = Dir(name)
 		self.all_summs_dict = {}
 		self._description = None
+		self._mixing_ratio = None
 		
 		for i in range(100):
 			try:
@@ -155,10 +189,25 @@ class SummaryExtractor(object):
 		self._n_simulations = self.get_description()['n_simulations']
 		self._n_replicas = len(self.get_description()['noise_list'])
 
+	def get_mixing_ratio_vs_separation_ratio_data(self):
+		separation_ratio = self.get_description()['temp_factor']
+		mixing_ratio = self._get_mixing_ratio_data()
+		return mixing_ratio, separation_ratio
+
 	def _get_mixing_ratio_data(self):
-		"""Fraction of replicas that get visit both lowest and highest temperatures."""
-		reps = {"{0:.2f}".format(b):0 
-			for b in self.get_description()['noise_list']}
+		"""Fraction of replicas that get to visit both lowest and highest temperatures."""
+		if self._mixing_ratio is not None:
+			return self._mixing_ratio
+		keys = [float("{0:.3f}".format(b)) 
+			for b in self.get_description()['noise_list']]
+
+		def get_key(n):
+			return keys[int(np.argmin([abs(k-n) for k in keys]))]
+
+
+		reps = {k:0 for k in keys}
+		mixing = {i:[] for i in range(self._n_replicas)}
+		
 		for s in range(self._n_simulations):
 			for r in range(self._n_replicas):
 				x, y = self.get_summary('noise', simulation_num=s,
@@ -167,55 +216,23 @@ class SummaryExtractor(object):
 
 				for i in range(n_steps):
 					if x[i] > self.get_description()['burn_in_period']:
-						reps["{0:.2f}".format(y[i])] += 1
-			return reps
-
-
-	def plot_temperature_occupation_rate(self):
-		reps = self._get_time_fraction_spent_at_each_temperature()
-		replicas = [0, 1, 2, 3, 4, 5, 6, 7]
-		bars = {}
-
-		for n in self.get_description()['noise_list']:
-			noise_val = "{0:.2f}".format(n)
-			bars[n] = 0
-
-		bars = {n:[reps[i][j] for i in range(self._n_replicas)
-			for j in self]}
+						reps[get_key(y[i])] += 1
+				
+				if all(reps[x]!= 0 for x in reps):
+					mixing[r].append(1)
+				else:
+					mixing[r].append(0)
+				
+				reps = {k:0 for k in keys}
 		
-
-
-	def _get_temperature_occupation_rate_data(self):
-		"""Returns dict[replica][noise_vals]=time_spen"""
-		"""MAYBE DELETE"""
-		reps = {i:{"{0:.2f}".format(j):0 for j in self.get_description()['noise_list']} 
-			for i in range(self._n_replicas)}
+		ratios = []
 		
 		for s in range(self._n_simulations):
-			for r in range(self._n_replicas):
-				for noise in self.get_description()['noise_list']:
-					x, y = self.get_summary('noise', simulation_num=s, 
-						replica_num=r, ordered=False, dataset_type='train')
-					#hist = {"{0:.3f}".format(j):0 for j in self.get_description()['noise_list']}
-					n_steps = int(x.shape[0])
-					#print(self.get_description()['noise_list'])
-					for i in range(n_steps):
-						if x[i] > self.get_description()['burn_in_period']:
-							try:
-								reps[r]["{0:.2f}".format(y[i])] += 1
-							except KeyError:
-								print(reps[r].keys())
-								raise
-							
-		"""
-		#total_steps = self._n_simulations * n_steps
-		for r in range(self._n_replicas):
-			total_steps = sum(reps[r].values())
-			for n in reps[r]:
-				reps[r][n] = reps[r][n] / total_steps
-		#print(total_steps)
-		"""
-		return reps
+			ratio = sum([mixing[r][s] for r in range(self._n_replicas)])/self._n_replicas
+			ratios.append(ratio)
+		self._mixing_ratio = sum(ratios)/len(ratios) 
+		return self._mixing_ratio
+
 
 	def get_accept_ratio_vs_separation_ratio_data(self):
 		"""Returns tuple (separation_ratio, accept_ratio, stddev)"""

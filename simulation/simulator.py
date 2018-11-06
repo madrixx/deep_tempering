@@ -36,7 +36,7 @@ class Simulator(object):
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
 		tuning_parameter_name=None, burn_in_period=None, 
 		loss_func_name='cross_entropy', 
-		surface_view='information', description=None):
+		surface_view='energy', description=None):
 		
 		
 			

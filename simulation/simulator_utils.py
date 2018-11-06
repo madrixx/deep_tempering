@@ -458,7 +458,7 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	"""
 
 
-	if ((architecture_name is None or architecture_name not in ['cnn', 'nn']) 
+	if ((architecture_name is None or type(architecture_name) != str) 
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
 		or (temp_ratio is None) 
 		or (optimizer is None or optimizer not in ['PTLD'])
@@ -482,3 +482,19 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + version
 
 	return name 
+
+def clean_dirs(dir_):
+    """Recursively removes all train, test and validation summary files \
+            and folders from previos training life cycles."""
+
+    try:
+        for file in os.listdir(dir_):
+            if os.path.isfile(os.path.join(dir_, file)):
+                os.remove(os.path.join(dir_, file))
+            else:
+                clean_dirs(os.path.join(dir_, file))
+
+        os.rmdir(dir_)
+    except OSError:
+        # if first simulation, nothing to delete
+        return
