@@ -1,9 +1,8 @@
 # Deep Tempering
 
-##
-Examples executing a single simulation
+## Examples executing a single simulation
 
-1. Simulate mnist dataset with multilayer perceptron using Langevin dynamics optimizer
+### 1. Simulate mnist dataset with multilayer perceptron using Langevin dynamics optimizer
 ```python
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -69,7 +68,7 @@ se = SummaryExtractor(experiment_name)
 se.print_report()
 ```
 
-2. Simulate mnist dataset with multilayer perceptron using dropout and GD optimizer
+### 2. Simulate mnist dataset with multilayer perceptron using dropout and GD optimizer
 
 ```python
 from tensorflow.examples.tutorials.mnist import input_data
