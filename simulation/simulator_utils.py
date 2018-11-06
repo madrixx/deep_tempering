@@ -483,6 +483,7 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 
 	return name 
 
+
 def clean_dirs(dir_):
     """Recursively removes all train, test and validation summary files \
             and folders from previos training life cycles."""
