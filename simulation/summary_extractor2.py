@@ -505,20 +505,22 @@ class SummaryExtractor(object):
 		return(x[y.argmin()][0], y.min()) 
 
 	def print_report(self):
-		print(self.get_description()['temp_factor'])
-		print('best accuracy on test dataset:',self.get_min_val('0/test_ordered_0/zero_one_loss'))
+		print('Separation Ratio:', self.get_description()['temp_factor'])
+		print('Best Accuracy on test dataset:',self.get_min_val('0/test_ordered_0/zero_one_loss'))
 
 		print()
 		print('cross entropy:')
 		print('min_cross_valid_train:', self.get_min_val('0/train_ordered_0/cross_entropy'))
 		print('min_cross_valid_test:', self.get_min_val('0/test_ordered_0/cross_entropy'))
 		print('min_cross_valid_validation:', self.get_min_val('0/valid_ordered_0/cross_entropy'))
-		print('stun:')
-		print('min_stun_train:', self.get_min_val('0/train_ordered_0/stun'))
-		print('min_stun_test:', self.get_min_val('0/test_ordered_0/stun'))
-		print('min_stun_validation:', self.get_min_val('0/valid_ordered_0/stun'))
+		#print('stun:')
+		#print('min_stun_train:', self.get_min_val('0/train_ordered_0/stun'))
+		#print('min_stun_test:', self.get_min_val('0/test_ordered_0/stun'))
+		#print('min_stun_validation:', self.get_min_val('0/valid_ordered_0/stun'))
 		print()
-		print('accept_ratio:', self._get_summary('0/special_summary/accept_ratio')[1][-1][0])
+		print('Acceptance Ratio:', self._get_summary('0/special_summary/accept_ratio')[1][-1][0])
+		print()
+		print('Mixing ratio (fraction of replicas that travelled all temperatures):', self._get_mixing_ratio_data())
 
 		fig = self.plot_diffusion(add_swap_marks=True)
 
@@ -530,8 +532,8 @@ class SummaryExtractor(object):
 		fig = self.plot(['cross', 'entropy', 'ordered', 'mean', 'test'], 
 			title='cross entropy for test dataset')
 
-		fig = self.plot(['stun', 'ordered', 'mean', 'test'], 
-			title='STUN loss for test dataset')
+		#fig = self.plot(['stun', 'ordered', 'mean', 'test'], 
+		#	title='STUN loss for test dataset')
 
 		fig = self.plot(['zero', 'one', 'loss', 'mean', 'test', 'ordered'], 
 			title='0-1 loss for test dataset')
