@@ -179,11 +179,16 @@ class LDSampler(NormalNoiseGDOptimizer):
 
 
 
+
 class GDOptimizer(Optimizer):
 
 	def __init__(self, learning_rate, replica_id, noise_list=None):
 		super(GDOptimizer, self).__init__(	learning_rate, 
 											replica_id)
+
+	def set_train_route(self, route):
+		"""Don't do anything. Added for consistency with other optimizers."""
+		return
 
 
 

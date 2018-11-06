@@ -320,9 +320,11 @@ class SummaryExtractor(object):
 			x, y = self.get_summary('noise', ordered=False, dataset_type=dataset_type, 
 				simulation_num=simulation_num, replica_num=r)
 			plot.plot(x, y, fig=fig, ax=ax, label='replica_' + str(r), splined_points_mult=None)
+		log_y = (self.get_description()['temp_factor']
+			if self.get_description()['noise_type'] == 'betas' else None)
 		plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
 			ylabel='NOISE VALUE', title='mixing between replicas',
-			log_y=self.get_description()['temp_factor'])
+			log_y=log_y)
 
 		return fig
 

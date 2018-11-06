@@ -276,6 +276,12 @@ def copy_to_graph(org_instance, to_graph, namespace="", exclude=None):
 		#Copy the other inputs needed for initialization
 		output_types = op._output_types[:]
 		input_types = op._input_types[:]
+
+		#print('name:', new_name)
+		#print('output_types:',output_types)
+		#print('input types',input_types)
+		#print('new inputs', new_inputs)
+		#print('##########################')
  
 		#Make a copy of the op_def too.
 		#Its unique to every _type_ of Operation.
