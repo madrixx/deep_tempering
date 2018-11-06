@@ -1,15 +1,15 @@
 # Deep Tempering
 
-### 
+##
+Usage Examples
 
-Usage Example
 1. Simulate mnist dataset with multilayer perceptron using Langevin dynamics
 ```python
 from tensorflow.examples.tutorials.mnist import input_data
 
 from simulation.simulator import Simulator
 from simulation.architectures.mnist_architectures import nn_mnist_architecture
-from simulation.summary_extractor import SummaryExtractor
+from simulation.summary_extractor2 import SummaryExtractor
 import simulation.simulator_utils as s_utils
 
 MNIST_DATAPATH = 'simulation/data/mnist/'
@@ -65,6 +65,8 @@ sim.train(train_data=train_data, train_labels=train_labels,
 
 
 # plot results
-se = SummaryExtractor(name)
+se = SummaryExtractor(experiment_name)
 se.print_report()
 ```
+
+2. Simulate dropout with convolutional nets with gradient descent optimizer
