@@ -36,7 +36,8 @@ class Simulator(object):
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
 		tuning_parameter_name=None, burn_in_period=None, 
 		loss_func_name='cross_entropy', 
-		surface_view='energy', description=None):
+		surface_view='energy', description=None,
+		rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10):
 		
 		
 			
@@ -70,7 +71,8 @@ class Simulator(object):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=0, surface_view=self.surface_view,
-				loss_func_name=self.loss_func_name)
+				loss_func_name=self.loss_func_name,
+				rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
@@ -80,7 +82,8 @@ class Simulator(object):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=i, surface_view=self.surface_view,
-				loss_func_name=self.loss_func_name)
+				loss_func_name=self.loss_func_name,
+				rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
 			
 			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
@@ -100,7 +103,8 @@ class Simulator(object):
 				self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 					noise_list, self.name, self.noise_type, 
 					self.summary_type, simulation_num=i, surface_view=self.surface_view,
-					loss_func_name=self.loss_func_name)
+					loss_func_name=self.loss_func_name,
+					rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
 			
 				sim_names.append(self.graph._summary.dir.name)
 				train_func(kwargs)
@@ -163,7 +167,7 @@ class Simulator(object):
 								g.add_summary(evaluated, step=step)
 
 							### test ###
-							if step % self.test_step == 0:
+							if step % self.test_step == 0 or step == 1:
 								evaluated = sess.run(g.get_train_ops('test'),
 									feed_dict=test_feed_dict)
 								g.add_summary(evaluated, step, dataset_type='test')
