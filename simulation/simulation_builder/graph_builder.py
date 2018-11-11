@@ -14,18 +14,28 @@ from simulation.simulation_builder.optimizers import GDOptimizer
 from simulation.simulation_builder.optimizers import NormalNoiseGDOptimizer
 from simulation.simulation_builder.optimizers import GDLDOptimizer
 from simulation.simulation_builder.optimizers import LDSampler
+from simulation.simulation_builder.optimizers import RMSPropOptimizer
 from simulation.simulation_builder.summary import Summary
 from simulation.simulator_exceptions import InvalidDatasetTypeError
 from simulation.simulator_exceptions import InvalidArchitectureFuncError
 from simulation.simulator_exceptions import InvalidLossFuncError
+from simulation.simulator_exceptions import InvalidNoiseTypeError
 from simulation.simulator_utils import __DEBUG__
 
 'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
 class GraphBuilder(object):
+	
 
 	def __init__(self, architecture, learning_rate, noise_list, name, 
 		noise_type='random_normal', summary_type=None, simulation_num=None, 
-		surface_view='energy', loss_func_name='cross_entropy'):
+		surface_view='energy', loss_func_name='cross_entropy',
+		rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10):
+
+		self.__noise_types = ['random_normal', 'ldsampler', 'betas',
+		'dropout', 'dropout_rmsprop', 'dropout_gd'] # possible noise types
+
+		if len(noise_list) == 0:
+			raise ValueError("The noise_list is empty")
 		
 		self._architecture = architecture
 		self._learning_rate = learning_rate
@@ -59,8 +69,8 @@ class GraphBuilder(object):
 				# curr_noise_dict stores {replica_id:current noise stddev VALUE}  
 				self._curr_noise_dict = {i:n for i, n in enumerate(self._noise_list)}
 
-			elif (len(res) == 4 and 
-				noise_type == 'dropout'):
+			elif (len(res) == 4 
+				and noise_type in ['dropout', 'dropout_rmsprop', 'dropout_gd']):
 				X, y, prob_placeholder, logits = res
 				self.X, self.y, probs, logits_list = copy_and_duplicate(X, y, logits, 
 					self._n_replicas, self._graph, prob_placeholder)
@@ -75,7 +85,10 @@ class GraphBuilder(object):
 				self._curr_noise_dict = {i:n 
 					for i, n in enumerate(sorted(self._noise_list, reverse=True))}
 
-			else: 
+			elif noise_type not in self.__noise_types: 	
+				raise InvalidNoiseTypeError(noise_type, self.__noise_types)
+			
+			else:
 				raise InvalidArchitectureFuncError(len(res), self._noise_type)
 
 		except:
@@ -115,20 +128,33 @@ class GraphBuilder(object):
 
 				with tf.name_scope('Optimizer_' + str(i)):
 
-					if noise_type == 'random_normal':
-						Optimizer = NormalNoiseGDOptimizer
-					elif noise_type == 'betas':
-						Optimizer = GDLDOptimizer
-					elif noise_type == 'LDSampler':
-						Optimizer = LDSampler
+					if noise_type.lower() == 'random_normal':
+						optimizer = NormalNoiseGDOptimizer(
+							self._learning_rate, i, self._noise_list)
+					
+					elif noise_type.lower() == 'betas':
+						optimizer = GDLDOptimizer(
+							self._learning_rate, i, self._noise_list)
+
+					elif noise_type.lower() == 'ldsampler':
+
+						optimizer = LDSampler(self._learning_rate,
+							i, self._noise_list)
+					
+					elif noise_type.lower() == 'dropout_rmsprop':
+						optimizer = RMSPropOptimizer(self._learning_rate, 
+							i, self._noise_list, decay=rmsprop_decay,
+							momentum=rmsprop_momentum, epsilon=rmsprop_epsilon)
+					
+					elif (noise_type.lower() == 'dropout_gd' 
+						or noise_type.lower() == 'dropout'):
+						optimizer = GDOptimizer(self._learning_rate, i,
+							self._noise_list)
+
 					else:
-						Optimizer = GDOptimizer
-					"""	
-					Optimizer = (NormalNoiseGDOptimizer 
-						if noise_type == 'random_normal' else GDOptimizer)
-					"""
-					optimizer = Optimizer(self._learning_rate, i,
-						noise_list=self._noise_list)
+						raise InvalidNoiseTypeError(noise_type, self.__noise_types)
+					
+					
 					
 					self._optimizer_dict[i] = optimizer
 
@@ -211,11 +237,13 @@ class GraphBuilder(object):
 		# evaluated = sess.run(get_train_ops(), feed_dict=...)
 		
 		Args:
-			test: if True, doesn't include ops for optimizing gradients 
-				in the returned list.
+			dataset_type: One of 'train'/'test'/'validation'
 
 		Returns:
 			train_ops for session run.
+
+		Raises:
+			InvalidDatasetTypeError if incorrect dataset_type
 		"""
 
 		loss = [self._cross_entropy_loss_dict[i] for i in range(self._n_replicas)]
@@ -234,10 +262,36 @@ class GraphBuilder(object):
 			raise InvalidDatasetTypeError()
 
 	def add_summary(self, evaluated, step, dataset_type='train'):
+		"""Wrapper for tf.summary.FileWriter.add_summary.
+
+		Args:
+			evaluated: A list returned by sess.run(get_train_ops())
+			step: A step for tf.summary.FileWriter.add_summary()
+			dataset_type: One of 'train'/'test'/'validation'
+
+		"""
 		summs = self.extract_evaluated_tensors(evaluated, 'summary')
 		self._summary.add_summary(summs, step, dataset_type)
 
 	def extract_evaluated_tensors(self, evaluated, tensor_type):
+		"""Extracts tensors from a list of tensors evaluated by tf.Session.
+
+		Example:
+		# evaluated = sess.run(get_train_ops(dataset_type='test'), 
+		#	feed_dict=feed_dict)
+		# cross_entropy = extract_evaluated_tensors(evaluated, 'cross_entropy')
+		# summary = sess.run(get_train_ops(dataset_type='test'), 'summary')
+
+		Args:
+			evaluated: A list returned by sess.run(get_train_ops())
+			tensor_type: One of 'cross_entropy'/'zero_one_loss'/'stun'/'summary'
+
+		Returns:
+			A list of specified (by tensor_type) tensors.
+
+		Raises:
+			InvlaidLossFuncError: Incorrect tensor_type value.
+			"""
 		
 		if tensor_type == 'cross_entropy':
 			return evaluated[:self._n_replicas]
@@ -259,6 +313,8 @@ class GraphBuilder(object):
 			raise InvalidLossFuncError() 
 
 	def update_noise_vals(self, evaluated):
+		"""This function will be removed..."""
+		
 		"""Updates noise values based on loss function.
 
 		If the noise_type is random_normal then the optimizaiton 
@@ -292,6 +348,9 @@ class GraphBuilder(object):
 				min{1, exp((beta_i-beta_i+1)*(loss_i/beta_i-loss_i+1/beta_i+1)}
 			if surface_view is 'energy', accept with probability:
 				min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)} 
+
+		Args:
+			evaluated: a list returned by sess.run(get_train_ops())
 		
 		"""
 		random_pair = random.choice(range(self._n_replicas - 1)) # pair number
@@ -306,8 +365,6 @@ class GraphBuilder(object):
 	
 		loss_list = self.extract_evaluated_tensors(evaluated, self._loss_func_name)
 
-		#losses_and_ids = [(l, x) for x, l in enumerate(loss_list)]
-		#losses_and_ids.sort(key=lambda x: x[0])
 		sorted_losses = sorted(loss_list)
 
 		sorted_i = sorted_losses.index(loss_list[i])
