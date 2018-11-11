@@ -443,7 +443,8 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	temp_ratio=None, optimizer='PTLD', do_swaps=True, 
 	swap_proba='boltzmann', n_replicas=None, surface_view='energy', beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
-	learning_rate=None, n_epochs=None, version='v5'):
+	learning_rate=None, n_epochs=None, noise_type=None, batch_size=None, 
+	version='v6'):
 	
 	
 	"""Experiment name:
@@ -455,8 +456,10 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		version: 'v3' means added burn-in period 
 		version: 'v4' learning_rate has been added
 		version: 'v5' has n_epochs in it
+		version: 'v6' has batch_size and noise_type
 	"""
-
+	
+	nones = [(x, y) for x, y in zip(locals().keys(), locals().values()) if y is None]	
 
 	if ((architecture_name is None or type(architecture_name) != str) 
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
@@ -471,15 +474,18 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		or (swap_attempt_step is None )
 		or (burn_in_period is None)
 		or (learning_rate is None)
-		or (n_epochs is None)):
-		raise InvalidExperimentValueError()
+		or (n_epochs is None)
+		or (batch_size is None)
+		or (noise_type is None)):
+		raise InvalidExperimentValueError(nones)
 
 	name = architecture_name + '_' + dataset + '_'
 	name = name + str(temp_ratio) + '_' + optimizer + '_'
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(beta_0) + '_' 
 	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
-	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + version
+	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + str(batch_size) + '_'
+	name = name + str(noise_type.replace('_', '')) + '_' + version
 
 	return name 
 
