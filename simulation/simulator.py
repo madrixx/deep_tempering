@@ -11,36 +11,150 @@ from simulation.simulation_builder.summary import Dir
 from simulation import simulator_utils as s_utils
 
 class Simulator(object):
+	"""Performs single/multiple simulation for calculating averages.
+
+	This class defines the API for performing simulations. This class 
+	trains models (possibly multiple times), while class GraphBuilder 
+	creates dataflow graphs with duplicated replicas. More functions
+	can be added to train models in different setups.
+	
+	### Usage
+
+	```python
+	from tensorflow.examples.tutorials.mnist import input_data
+	import numpy as np
+
+	from simulation.simulator import Simulator
+	from simulation.summary_extractor2 import SummaryExtractor
+	import simulation.simulator_utils as s_utils
+	from simulation.architectures.mnist_architectures import nn_mnist_architecture_dropout
+	MNIST_DATAPATH = 'simulation/data/mnist/'
+
+	mnist = input_data.read_data_sets(MNIST_DATAPATH)
+	train_data = mnist.train.images
+	train_labels = mnist.train.labels
+	test_data = mnist.test.images
+	test_labels = mnist.test.labels
+	valid_data = mnist.validation.images
+	valid_labels = mnist.validation.labels
+
+	n_replicas = 8
+	separation_ratio = 1.21
+
+	# set simulation parameters
+	architecture_func = nn_mnist_architecture_dropout
+	learning_rate = 0.01
+	noise_list = [1/separation_ratio**i for i in range(n_replicas)]
+	noise_type = 'dropout_rmsprop'
+	batch_size = 200
+	n_epochs = 50
+	name = 'test_simulation' # simulation name
+	test_step = 300 # 1 step==batch_size
+	swap_attempt_step = 300
+	burn_in_period = 400
+	loss_func_name = 'cross_entropy'
+	description = 'RMSProp with dropout.'
+	rmsprop_decay = 0.9
+	rmsprop_momentum = 0.001
+	rmsprop_epsilon=1e-6
+
+	# make sure that there are no directories that were previously created with same name
+	# otherwise, there will be problems extracting simulated results
+	s_utils.clean_dirs('simulation/summaries/' + name)
+	s_utils.clean_dirs('simulation/summaries/compressed/' + name)
+
+	# create and run simulation
+
+	sim = Simulator(
+		architecture=architecture_func,
+		learning_rate=learning_rate,
+		noise_list=noise_list,
+		noise_type='dropout_rmsprop',
+		batch_size=batch_size,
+		n_epochs=n_epochs,
+	    test_step=test_step,
+		name=name,
+		swap_attempt_step=swap_attempt_step,
+		burn_in_period=burn_in_period,
+		loss_func_name='cross_entropy',
+	    description=description,
+	    rmsprop_decay=rmsprop_decay,
+	    rmsprop_epsilon=rmsprop_epsilon,
+	    rmsprop_momentum=rmsprop_momentum
+		)
+
+	sim.train(train_data=train_data, train_labels=train_labels,
+		test_data=test_data, test_labels=test_labels, 
+		validation_data=valid_data, validation_labels=valid_labels)
+
+
+	# plot results
+	se = SummaryExtractor(name)
+	se.print_report(mixing_log_y=separation_ratio)
+
+	```
 	"""
 	
-	Args:
-		architecture:
-		learning_rate:
-		noise_list:
-		noise_type:
-		batch_size:
-		n_epochs:
-		n_simulatins:
-		summary_type:
-		test_step:
-		swap_attempt_step:
-		temp_factor:
-		tuning_parameter_name:
-		surface_view: 'information' or 'energy'. See 
-			GraphBuilder.swap_replicas() for detailed explanation.
-		description: 
-
-	"""
 	def __init__(self, architecture, learning_rate, noise_list, noise_type, 
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
 		tuning_parameter_name=None, burn_in_period=None, 
 		loss_func_name='cross_entropy', 
 		surface_view='energy', description=None,
-		rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10):
+		rmsprop_decay=0.9, rmsprop_momentum=0.001, rmsprop_epsilon=1e-6):
+		"""Creates a new simulator object.
 		
-		
+		Args:
+			architecture: A function that creates inference model (e.g. 
+				see simulation.architectures.nn_mnist_architecture)
+			learning_rate: Learning rate for optimizer
+			noise_list: A list (not np.array!) for noise/temperatures/dropout
+				values
+			noise_type: A string specifying the noise type and optimizer to apply.
+				Possible values could be seen at 
+				simulation.simulation_builder.graph_builder.GraphBuilder.__noise_types
+			batch_size: Batch Size
+			n_epochs: Number of epochs for each simulation
+			n_simulatins: Number of simulation to run.
+			summary_type: Specifies what summary types to store. Detailed possibilities
+				could be seen in 
+				simulation.simulation_builder.graph_builder.Summary.
+				Default is None
+			test_step: An integer specifing an interval of steps to perform until
+				running a test dataset (1 step equals batch_size)
+			swap_attempt_step: An integer specifying an interval to perform until
+				attempting to swap between replicas based on validation dataset.
+			temp_factor: A separation ratio between two adjacent temperatures. 
+				This value is not important for simulation because it the 
+				noise_list already contain the separated values. This value is
+				(as well as others) are used to be stored in the simulation 
+				description file.  
+			tuning_parameter_name: As a temp_factor value, this argument is 
+				also not important for simulation, but is stored in the description
+				file.burn_in_period
+			burn_in_period: A number of steps until the swaps start to occure.
+			loss_func_name: A function which we want to optimize. Currently, 
+				only cross_entropy and stun (stochastic tunneling) are 
+				supported.
+			surface_view: 'information' or 'energy'. See 
+				GraphBuilder.swap_replicas() for detailed explanation.
+			description: A custom string that is stored in the description file.
+			rmsprop_decay: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
+			rmsprop_momentum: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
+			rmsprop_epsilon: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
 			
+
+		"""
+		
 		
 		self.architecture = architecture
 		self.learning_rate = learning_rate
@@ -67,12 +181,17 @@ class Simulator(object):
 		if description:
 			self._log_params(description)
 
+		self.rmsprop_decay = rmsprop_decay
+		self.rmsprop_momentum = rmsprop_momentum
+		self.rmsprop_epsilon = rmsprop_epsilon
+
 		if n_simulations == 1:
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=0, surface_view=self.surface_view,
 				loss_func_name=self.loss_func_name,
-				rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
+				rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
+				rmsprop_epsilon=self.rmsprop_epsilon)
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
@@ -83,7 +202,8 @@ class Simulator(object):
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=i, surface_view=self.surface_view,
 				loss_func_name=self.loss_func_name,
-				rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
+				rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
+				rmsprop_epsilon=self.rmsprop_epsilon)
 			
 			sim_names.append(self.graph._summary.dir.name)
 			train_func(kwargs)
@@ -104,7 +224,8 @@ class Simulator(object):
 					noise_list, self.name, self.noise_type, 
 					self.summary_type, simulation_num=i, surface_view=self.surface_view,
 					loss_func_name=self.loss_func_name,
-					rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10)
+					rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
+					rmsprop_epsilon=self.rmsprop_epsilon)
 			
 				sim_names.append(self.graph._summary.dir.name)
 				train_func(kwargs)
@@ -113,6 +234,7 @@ class Simulator(object):
 
 	
 	def train_PTLD(self, kwargs):
+		"""Trains and swaps between replicas"""
 	
 		try:
 			g = self.graph
@@ -292,6 +414,7 @@ class Simulator(object):
 
 	
 	def _log_params(self, desciption):
+		"""Creates a description file."""
 		dirpath = self._dir.log_dir
 		filepath = os.path.join(dirpath, 'description.json')
 		if not os.path.exists(dirpath):
@@ -317,6 +440,7 @@ class Simulator(object):
 			json.dump(_log, fo, indent=4)
 
 	def print_log(self, loss, epoch, swap_accept_ratio, latest_accept_proba, step):
+		"""Helper for logs during training."""
 		buff = 'epoch:' + str(epoch) + ', step:' + str(step) + ', '
 		buff = buff + ','.join([str(l) for l in loss]) + ', '
 		buff = buff + 'accept_ratio:' + str(swap_accept_ratio)
