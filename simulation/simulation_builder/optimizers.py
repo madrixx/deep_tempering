@@ -13,11 +13,23 @@ from simulation.simulation_builder.device_placer import _gpu_device_name
 
 class Optimizer(object):
 	"""Wrapper for tf.train.GradientDescentOptimizer"""
-	def __init__(self, learning_rate, replica_id, noise_list=None):
+	def __init__(self, learning_rate, replica_id, noise_list=None,
+		 decay=None, momentum=None, epsilon=None,
+			use_locking=None, centered=None):
+		"""decay, momentum, epsilon, use_locking, centered args are for
+			RMSPropOptimizer only."""
+		self._initializer(learning_rate, replica_id, noise_list)
+		
+
+	def _initializer(self, learning_rate, replica_id, noise_list, 
+		decay=None, momentum=None, epsilon=None,
+		use_locking=None, centered=None):
+
 		self.learning_rate = learning_rate
 		self.replica_id = replica_id
 		self.noise_list = noise_list
-		self.tf_optimizer = tf.train.GradientDescentOptimizer(self.learning_rate)
+		self.tf_optimizer = tf.train.GradientDescentOptimizer(self.learning_rate) 
+			
 		self.train_op = None
 		self.trainable_variables = None
 
@@ -184,11 +196,53 @@ class GDOptimizer(Optimizer):
 
 	def __init__(self, learning_rate, replica_id, noise_list=None):
 		super(GDOptimizer, self).__init__(	learning_rate, 
-											replica_id)
+											replica_id,
+											noise_list,
+											)
 
 	def set_train_route(self, route):
 		"""Don't do anything. Added for consistency with other optimizers."""
 		return
 
+
+class RMSPropOptimizer(Optimizer):
+	"""Wrapper for tf.train.RMSPropOptimizer."""
+	def __init__(self, learning_rate, replica_id, noise_list=None,
+		decay=0.9, momentum=0.001, epsilon=1e-6,
+		use_locking=False, centered=False):
+		super(RMSPropOptimizer, self).__init__(learning_rate,
+			replica_id, noise_list, decay, momentum, epsilon,
+			use_locking, centered)
+		
+
+	def _initializer(self, learning_rate, replica_id, noise_list, 
+		decay=0.9, momentum=0.001, epsilon=1e-6,
+		use_locking=None, centered=None):
+
+		self.replica_id = replica_id
+		self.tf_optimizer = tf.train.RMSPropOptimizer(learning_rate, 
+				decay=decay, momentum=momentum, epsilon=epsilon,
+				use_locking=use_locking, centered=centered)
+
+		self.train_op = None
+		self.trainable_variables = None
+
+	
+	def minimize(self, loss):
+		self.trainable_variables = self._get_dependencies(loss)
+		with tf.device(_gpu_device_name(self.replica_id)):
+			self.train_op = self.tf_optimizer.minimize(loss)
+		return self.train_op
+	
+	def set_train_route(self, route):
+		"""Don't do anything. Added for consistency with other optimizers."""
+		return
+
+	"""
+	def get_train_op(self,):
+		if self.train_op is None:
+			raise ValueError('train_op is not set. Call minimize() to set.')
+		return self.train_op
+	"""
 
 
