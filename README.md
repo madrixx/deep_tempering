@@ -23,23 +23,23 @@ valid_labels = mnist.validation.labels
 
 
 # set simulation parameters
-n_simulations = 1
 batch_size = 50
-n_epochs = 30
-burn_in_period = 2000
+n_epochs = 5
 learning_rate = 0.01
 beta_0 = 200
 temp_factor = 1.1
 n_replicas = 8
 noise_list = [beta_0*temp_factor**i for i in range(n_replicas)]
-simulation_name = 'test_simulation'
+name = 'ptld_simulation'
 swap_attempt_step = 500 # 1 step==batch_size
-description='Test simulation!'
+burn_in_period = 2000
+test_step = 500
+description='Parallel Tempering with Langevin Dynamics'
 
 # make sure that there are no directories that were previously created with same name
 # otherwise, there will be problems extracting simulated results
-s_utils.clean_dirs('simulation/summaries/' + simulation_name)
-s_utils.clean_dirs('simulation/summaries/compressed/' + simulation_name)
+s_utils.clean_dirs('simulation/summaries/' + name)
+s_utils.clean_dirs('simulation/summaries/compressed/' + name)
 
 # create and run simulation
 sim = Simulator(
@@ -49,10 +49,10 @@ sim = Simulator(
 	noise_type='betas',
 	batch_size=batch_size,
 	n_epochs=n_epochs,
-	name=simulation_name,
+	name=name,
 	swap_attempt_step=swap_attempt_step,
+    test_step=test_step,
 	temp_factor=temp_factor,
-	tuning_parameter_name='temp_factortemp',
 	description=description,
 	burn_in_period=burn_in_period,
 	loss_func_name='cross_entropy'
@@ -64,7 +64,7 @@ sim.train(train_data=train_data, train_labels=train_labels,
 
 
 # plot results
-se = SummaryExtractor(experiment_name)
+se = SummaryExtractor(name)
 se.print_report()
 ```
 
