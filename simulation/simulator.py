@@ -119,20 +119,22 @@ class Simulator(object):
 			summary_type: Specifies what summary types to store. Detailed possibilities
 				could be seen in 
 				simulation.simulation_builder.graph_builder.Summary.
-				Default is None
+				Default is None (if None stores all summaries)
 			test_step: An integer specifing an interval of steps to perform until
 				running a test dataset (1 step equals batch_size)
 			swap_attempt_step: An integer specifying an interval to perform until
 				attempting to swap between replicas based on validation dataset.
 			temp_factor: A separation ratio between two adjacent temperatures. 
-				This value is not important for simulation because it the 
-				noise_list already contain the separated values. This value is
-				(as well as others) are used to be stored in the simulation 
-				description file.  
-			tuning_parameter_name: As a temp_factor value, this argument is 
-				also not important for simulation, but is stored in the description
-				file.burn_in_period
-			burn_in_period: A number of steps until the swaps start to occure.
+				This value is not important for simulation because the 
+				noise_list already contains the separated values. This value is
+				(as well as some others) are stored in the simulation 
+				description file (this file is created by _log_params() 
+				function).
+			tuning_parameter_name: As the temp_factor value, this argument is 
+				also not important for simulation. It is stored in the description
+				file as well.
+			burn_in_period: A number of steps until the swaps start to be 
+				proposed.
 			loss_func_name: A function which we want to optimize. Currently, 
 				only cross_entropy and stun (stochastic tunneling) are 
 				supported.
@@ -152,7 +154,6 @@ class Simulator(object):
 				for noise type 'dropout_rmsprop'. This value is ignored for 
 				other noise_types.
 			
-
 		"""
 		
 		
