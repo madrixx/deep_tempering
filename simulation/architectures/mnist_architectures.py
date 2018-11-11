@@ -193,9 +193,9 @@ def nn_mnist_architecture_dropout(graph):
 		logits
 	"""
 	n_inputs = 28*28
-	n_hidden1 = 300
-	n_hidden2 = 200
-	n_hidden3 = 100
+	n_hidden1 = 1024
+	n_hidden2 = 1024
+	n_hidden3 = 2048
 	n_outputs = 10
 	
 	with graph.as_default():
