@@ -13,6 +13,8 @@ import re
 from simulation.simulation_builder.summary import Dir
 from simulation.simulator_exceptions import InvalidExperimentValueError
 
+'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
+
 __DEBUG__ = False
 
 

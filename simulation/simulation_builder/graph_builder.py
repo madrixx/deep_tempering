@@ -22,8 +22,18 @@ from simulation.simulator_exceptions import InvalidLossFuncError
 from simulation.simulator_exceptions import InvalidNoiseTypeError
 from simulation.simulator_utils import __DEBUG__
 
-'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
+
+
 class GraphBuilder(object):
+	"""Defines a dataflow graph with duplicated ensembles.
+
+	This object stores all copies of the systems at different 
+	temperatures and provides an API for performing the 
+	exchanges between two ensembles and storing the summary 
+	values. This class is used to train models in the 
+	Parallel Tempering framework.
+
+	"""
 	
 
 	def __init__(self, architecture, learning_rate, noise_list, name, 
@@ -50,8 +60,9 @@ class GraphBuilder(object):
 		self._summary_type = summary_type
 		self._simulation_num = '' if simulation_num is None else str(simulation_num)
 		self._loss_func_name = loss_func_name
-		# create graph with duplicates based on architecture function 
-		# and noise type 
+		
+		# create graph with duplicated ensembles based on the provided
+		# architecture function and noise type 
 		res = []
 		try:
 			res = self._architecture(tf.Graph())
@@ -95,8 +106,8 @@ class GraphBuilder(object):
 			raise
 
 		# from here, whole net that goes after logits is created
-		self.__DEBUG__logits_list = logits_list
-		self.__DEBUG__routes = [] # remove this !
+		self.__DEBUG__logits_list = logits_list # remove this
+		self.__DEBUG__routes = [] # remove this too!
 		self._cross_entropy_loss_dict = {}
 		self._zero_one_loss_dict = {}
 		self._stun_loss_dict = {}

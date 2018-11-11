@@ -196,8 +196,27 @@ class Simulator(object):
 		
 
 	def train_n_times(self, train_func, *args, **kwargs):
-		"""Trains `n_simulations` times using the same setup."""
+		"""Trains `n_simulations` times using the same setup.
+
+		During training, the summary values are stored using native
+		tensorflow Summary class, but later copied (see 
+		simulation.simulator_utils.extract_and_remove_simulation())
+		to a pickle object, since tensorflow summary objects 
+		take too many space on disk. These pickle summaries are 
+		accessed through SummaryExtractor class defined in 
+		simulation.summary_extractor2 file. After they copied, the 
+		original tensorflow summary files are deleted and connot be
+		accessed by tensorboard.
+
+		Args:
+			train_func: A function that performs training (e.g. 
+				train_PTLD)
+			kwargs: train_dataset, train_labels, test_data, test_labels,
+				validation_data, validation_labels
+		"""
+		
 		sim_names = []
+
 		for i in range(self.n_simulations):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
@@ -207,6 +226,7 @@ class Simulator(object):
 				rmsprop_epsilon=self.rmsprop_epsilon)
 			
 			sim_names.append(self.graph._summary.dir.name)
+			
 			train_func(kwargs)
 
 			gc.collect()
@@ -218,6 +238,7 @@ class Simulator(object):
 
 		sim_names = []
 		i = 0
+		
 		for beta_0 in betas:
 			for j in range(self.n_simulations):
 				noise_list = [beta_0, temp_factor*beta_0]
@@ -229,8 +250,11 @@ class Simulator(object):
 					rmsprop_epsilon=self.rmsprop_epsilon)
 			
 				sim_names.append(self.graph._summary.dir.name)
+				
 				train_func(kwargs)
+				
 				gc.collect()
+				
 				i += 1
 
 	
@@ -247,12 +271,15 @@ class Simulator(object):
 			valid_labels = kwargs.get('validation_labels', None)
 			test_feed_dict = g.create_feed_dict(test_data, test_labels, 
 				dataset_type='test')
+
+			# create iterator for train dataset
 			with g.get_tf_graph().as_default():
 				data = tf.data.Dataset.from_tensor_slices({
 					'X':train_data,
 					'y':train_labels
 					}).batch(self.batch_size)
 				iterator = data.make_initializable_iterator()
+		
 		except:
 			raise
 
@@ -265,16 +292,6 @@ class Simulator(object):
 				sess.run(g.variable_initializer)
 				next_batch = iterator.get_next()
 
-				# validation first time
-				"""
-				valid_feed_dict = g.create_feed_dict(
-					valid_data, valid_labels, 'validation')
-				evaluated = sess.run(g.get_train_ops('validation'),
-					feed_dict=valid_feed_dict)
-				g.add_summary(evaluated, step, dataset_type='validation')
-				g.swap_replicas(evaluated)
-				g._summary.flush_summary_writer()
-				"""
 				for epoch in range(self.n_epochs):
 					
 					while True:
