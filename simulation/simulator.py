@@ -321,97 +321,10 @@ class Simulator(object):
 				g._summary.close_summary_writer()
 
 	def train(self, **kwargs):
+		"""Trains model single time.
+
+		This function is basically the same as train_PTLD"""
 		self.train_PTLD(kwargs)
-		"""
-		try:
-			g = self.graph
-			train_data = kwargs.get('train_data', None)
-			train_labels = kwargs.get('train_labels', None)
-			test_data = kwargs.get('test_data', None)
-			test_labels = kwargs.get('test_labels', None)
-			valid_data = kwargs.get('validation_data', None)
-			valid_labels = kwargs.get('validation_labels', None)
-			test_feed_dict = g.create_feed_dict(test_data, test_labels, 
-				dataset_type='test')
-			with g.get_tf_graph().as_default():
-				data = tf.data.Dataset.from_tensor_slices({
-					'X':train_data,
-					'y':train_labels
-					}).batch(self.batch_size)
-				iterator = data.make_initializable_iterator()
-		except:
-			raise
-
-		with g.get_tf_graph().as_default():
-
-			step = 0
-			
-			with tf.Session() as sess:
-				sess.run(iterator.initializer)
-				sess.run(g.variable_initializer)
-				next_batch = iterator.get_next()
-				
-				# validation first time
-				#valid_feed_dict = g.create_feed_dict(
-				#	valid_data, valid_labels, 'validation')
-				#evaluated = sess.run(g.get_train_ops('validation'),
-				#	feed_dict=valid_feed_dict)
-				#g.add_summary(evaluated, step, dataset_type='validation')
-				#g.swap_replicas(evaluated)
-				#g._summary.flush_summary_writer()
-				
-				valid_summary_step = (self.swap_attempt_step 
-					if self.swap_attempt_step >= self.test_step else np.ceil(self.test_step/self.swap_attempt_step))
-
-								
-				for epoch in range(self.n_epochs):
-					
-					while True:
-						try:
-							step += 1
-
-							### train ###
-							batch = sess.run(next_batch)
-							feed_dict = g.create_feed_dict(batch['X'], batch['y'])
-							evaluated = sess.run(g.get_train_ops(), 
-								feed_dict=feed_dict)
-							if step % 100 == 0:
-								g.add_summary(evaluated, step=step)
-
-							### test ###
-							if step % self.test_step == 0:
-								evaluated = sess.run(g.get_train_ops('test'),
-									feed_dict=test_feed_dict)
-								g.add_summary(evaluated, step, dataset_type='test')
-								loss = g.extract_evaluated_tensors(evaluated, self.loss_func_name)
-								
-								self.print_log(loss, epoch, g.swap_accept_ratio, g.latest_accept_proba, step)
-								
-							### validation ###
-							if step % self.swap_attempt_step == 0:
-								
-								valid_feed_dict = g.create_feed_dict(
-									valid_data, valid_labels, 'validation')
-								evaluated = sess.run(g.get_train_ops('validation'),
-									feed_dict=valid_feed_dict)
-								
-								g.add_summary(evaluated, step, dataset_type='validation')
-								#valid_inc = (valid_inc + 1) % valid_summary_step
-								if step > self.burn_in_period:
-									g.swap_replicas(evaluated)
-								else:
-									g.swap_accept_ratio = 0
-								g._summary.flush_summary_writer()
-						
-						except tf.errors.OutOfRangeError:
-							sess.run(iterator.initializer)
-							break
-
-				
-				g._summary.close_summary_writer()
-				"""
-
-	
 
 	
 	def _log_params(self, desciption):
