@@ -123,7 +123,7 @@ class Plot(object):
 
 
 
-		# check if there are infinity
+		# check if there are infinity vals and replace by finite "big" vals
 		x_ = [e  if isinf(e)==False else max_(x) + max_(x)*2
 			for e in x]
 		y_ = [e if isinf(e)==False else max_(y) + max_(y)*2
@@ -309,7 +309,7 @@ class SummaryExtractor(object):
 		fig.set_size_inches(12, 4.5) # (width, height)
 		return fig
 
-	def plot_mixing_between_replicas(self, dataset_type='train', simulation_num=0):
+	def plot_mixing_between_replicas(self, mixing_log_y=None, dataset_type='train', simulation_num=0):
 		plot = Plot()
 		fig, ax = plt.subplots()
 
@@ -322,6 +322,7 @@ class SummaryExtractor(object):
 			plot.plot(x, y, fig=fig, ax=ax, label='replica_' + str(r), splined_points_mult=None)
 		log_y = (self.get_description()['temp_factor']
 			if self.get_description()['noise_type'] == 'betas' else None)
+		log_y = (mixing_log_y if mixing_log_y is not None else None)
 		plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
 			ylabel='NOISE VALUE', title='mixing between replicas',
 			log_y=log_y)
@@ -387,12 +388,19 @@ class SummaryExtractor(object):
 			req_str = (str(simulation_num) 
 				+ '/special_summary/diffusion_'
 				+ str(replica_num)) 
-		elif summ_name == 'accept_ratio':
+		elif summ_name == 'accept_ratio':	
 			req_str = (str(simulation_num) 
 				+ '/special_summary/accept_ratio_replica_'
 				+ str(replica_num)) 
-		
-		x, y = self._get_summary(req_str)
+		else:
+			raise ValueError('Invalid summ_name argument:', summ_name)
+		try:
+			x, y = self._get_summary(req_str)
+		except KeyError:
+			print(req_str)
+			print(locals())
+			raise
+
 		return np.ndarray.flatten(x), np.ndarray.flatten(y)
 
 
@@ -413,6 +421,7 @@ class SummaryExtractor(object):
 			else:
 				return self.all_summs_dict[summ_name]
 		except KeyError:
+			print(summ_name)
 			print(self._dir.name)
 			raise
 
@@ -504,7 +513,7 @@ class SummaryExtractor(object):
 		x, y = self._get_summary(summ_name)
 		return(x[y.argmin()][0], y.min()) 
 
-	def print_report(self):
+	def print_report(self, mixing_log_y=None):
 		print('Separation Ratio:', self.get_description()['temp_factor'])
 		print('Best Accuracy on test dataset:',self.get_min_val('0/test_ordered_0/zero_one_loss'))
 
@@ -524,7 +533,7 @@ class SummaryExtractor(object):
 
 		fig = self.plot_diffusion(add_swap_marks=True)
 
-		fig = self.plot_mixing_between_replicas()
+		fig = self.plot_mixing_between_replicas(mixing_log_y)
 		
 
 		fig = self.plot(['accept', 'ratio', 'replica', 'mean'], title='accept_ratio')
