@@ -42,11 +42,31 @@ class InvalidLossFuncError(Exception):
 	def __str__(self):
 		return self.msg
 
+class InvalidNoiseTypeError(Exception):
+	pass
+
+	def __init__(self, noise_type, noise_types):
+		msg = "Invalid Noise Type. Avalable types are: "
+		msg = msg + ', '.join(noise_types)
+		msg = msg + ". But given: " + noise_type + ".\n"
+
+		self.msg = msg
+
+		
+
+	def __str__(self):
+		return self.msg
+
 class InvalidExperimentValueError(Exception):
 	pass
 
-	def __init__(self, ):
-		msg = 'Invalid value of a parameter. Valid parameters are: \n'
+	def __init__(self, nones):
+		msg = ''
+		if len(nones) > 0:
+			msg = msg + "The following args have None values:\n"
+			msg = msg + ", ".join([str(x[0])+':'+str(x[1]) for x in nones])
+			msg = msg + "\n"
+		msg = msg + 'Valid args are: \n'
 		msg = msg + "architecture_name: 'nn/cnn' + \{ 075, 125...\} \n"
 		msg = msg + "dataset: 'mnist' or 'cifar' \n"
 		msg = msg + "tuning_param_name: 'swapstep' or 'tempfactor' \n"
@@ -56,11 +76,13 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "n_replicas: int or str \n"
 		msg = msg + "surface_view: 'energy' or 'info' \n"
 		msg = msg + "beta_0: int or str \n"
-		msg = msg + "loss_func_name: 'crossentropy' or 'zerooneloss' \n"
+		msg = msg + "loss_func_name: crossentropy or zerooneloss or stun' \n"
 		msg = msg + "swap_attempt_step: int or str \n"
 		msg = msg + "burn_in_period: int or float\n"
 		msg = msg + "learning_rate: float\n"
-		msg = msg + "n_epochs: int"
+		msg = msg + "n_epochs: int pr str\n"
+		msg = msg + "batch_size: int or str\n"
+		msg = msg + "noise_type: see InvalidNoiseTypeError for available noise vals"
 		self.msg = msg
 
 	def __str__(self):
