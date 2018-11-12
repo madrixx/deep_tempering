@@ -51,7 +51,7 @@ sim = Simulator(
 	n_epochs=n_epochs,
 	name=name,
 	swap_attempt_step=swap_attempt_step,
-    test_step=test_step,
+	test_step=test_step,
 	temp_factor=temp_factor,
 	description=description,
 	burn_in_period=burn_in_period,
@@ -78,6 +78,7 @@ from simulation.simulator import Simulator
 from simulation.summary_extractor2 import SummaryExtractor
 import simulation.simulator_utils as s_utils
 from simulation.architectures.mnist_architectures import nn_mnist_architecture_dropout
+
 MNIST_DATAPATH = 'simulation/data/mnist/'
 
 mnist = input_data.read_data_sets(MNIST_DATAPATH)
@@ -89,21 +90,21 @@ valid_data = mnist.validation.images
 valid_labels = mnist.validation.labels
 
 n_replicas = 8
-separation_ratio = 1.21
 
 # set simulation parameters
 architecture_func = nn_mnist_architecture_dropout
 learning_rate = 0.01
-noise_list = [1/separation_ratio**i for i in range(n_replicas)]
+noise_list = [1-x for x in np.geomspace(start=0.01, stop=0.99, num=n_replicas)]
 noise_type = 'dropout_rmsprop'
 batch_size = 200
-n_epochs = 50
-name = 'test_simulation' # simulation name
-test_step = 300 # 1 step==batch_size
+n_epochs = 20
+name = 'rmsprop_simulation' # simulation name
+test_step = 400 # 1 step==batch_size
 swap_attempt_step = 300
 burn_in_period = 400
 loss_func_name = 'cross_entropy'
 description = 'RMSProp with dropout.'
+proba_coeff = 250
 rmsprop_decay = 0.9
 rmsprop_momentum = 0.001
 rmsprop_epsilon=1e-6
@@ -122,15 +123,16 @@ sim = Simulator(
 	noise_type='dropout_rmsprop',
 	batch_size=batch_size,
 	n_epochs=n_epochs,
-    test_step=test_step,
+	test_step=test_step,
 	name=name,
 	swap_attempt_step=swap_attempt_step,
 	burn_in_period=burn_in_period,
 	loss_func_name='cross_entropy',
-    description=description,
-    rmsprop_decay=rmsprop_decay,
-    rmsprop_epsilon=rmsprop_epsilon,
-    rmsprop_momentum=rmsprop_momentum
+	description=description,
+	proba_coeff=proba_coeff,
+	rmsprop_decay=rmsprop_decay,
+	rmsprop_epsilon=rmsprop_epsilon,
+	rmsprop_momentum=rmsprop_momentum
 	)
 
 sim.train(train_data=train_data, train_labels=train_labels,
@@ -140,6 +142,6 @@ sim.train(train_data=train_data, train_labels=train_labels,
 
 # plot results
 se = SummaryExtractor(name)
-se.print_report(mixing_log_y=separation_ratio)
+se.print_report()
 
 ```
