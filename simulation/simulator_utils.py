@@ -12,12 +12,13 @@ import re
 
 from simulation.simulation_builder.summary import Dir
 from simulation.simulator_exceptions import InvalidExperimentValueError
+from simulation.summary_extractor2 import SummaryExtractor
 
 'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
 
 __DEBUG__ = False
 
-
+"""
 class MultiExperimentSummaryExtractor(object):
 
 	def __init__(self, experiments):
@@ -276,7 +277,8 @@ class MultiExperimentSummaryExtractor(object):
 
 	def plot_report(self, report):
 		return 1
-
+"""
+"""
 class SummaryExtractor(object):
 
 	def __init__(self, name):
@@ -298,7 +300,7 @@ class SummaryExtractor(object):
 				break
 
 	def get_summary(self, summ_name, split=True):
-		"""Returns numpy arrays (x, y) of summaries.
+		""""""Returns numpy arrays (x, y) of summaries.
 
 		Args:
 			summary_type: Name of the scalar summary
@@ -306,7 +308,7 @@ class SummaryExtractor(object):
 
 		Returns:
 			(x, y) numpy array
-		"""
+		""""""
 		if split:
 			return np.hsplit(self.all_summs_dict[summ_name], 2)
 		else:
@@ -367,7 +369,7 @@ class SummaryExtractor(object):
 				for i in range(self.n_experiments)]
 			self.all_summs_dict['mean/' + name] = np.mean(np.array(arrays), axis=0)
 
-
+"""
 def extract_summary(log_dir, delim="/"):
 	"""
 	Extracts summaries from simulation `name`
