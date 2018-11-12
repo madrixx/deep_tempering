@@ -442,23 +442,25 @@ def extract_and_remove_simulation(path):
 
 
 def generate_experiment_name(architecture_name=None, dataset='mnist', 
-	temp_ratio=None, optimizer='PTLD', do_swaps=True, 
-	swap_proba='boltzmann', n_replicas=None, surface_view='energy', beta_0=None, 
+	temp_ratio=None, do_swaps=True, 
+	swap_proba='boltzmann', n_replicas=None, beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
 	learning_rate=None, n_epochs=None, noise_type=None, batch_size=None, 
-	version='v6'):
+	proba_coeff=1.0, version='v6'):
 	
 	
 	"""Experiment name:
 	<arhictecture>_<dataset>_<tuning parameter>_<optimizer>_...
 	<dynamic=swaps occure/static=swaps don't occur>_...
-	<n_replicas>_<surface view>_<starting_beta_>
+	<n_replicas>_<surface view>_<starting_beta_>...
 
 		version: 'v2' means that summary stores diffusion value
 		version: 'v3' means added burn-in period 
 		version: 'v4' learning_rate has been added
 		version: 'v5' has n_epochs in it
 		version: 'v6' has batch_size and noise_type
+		version: 'v7' has proba coefficient + optimizer has been removed
+			+ surface_view has been removed
 	"""
 	
 	nones = [(x, y) for x, y in zip(locals().keys(), locals().values()) if y is None]	
@@ -466,11 +468,10 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	if ((architecture_name is None or type(architecture_name) != str) 
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
 		or (temp_ratio is None) 
-		or (optimizer is None or optimizer not in ['PTLD'])
+		
 		or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
 		or (swap_proba is None or swap_proba not in ['boltzmann'])
 		or (n_replicas is None)
-		or (surface_view is None or surface_view not in ['energy', 'info'])
 		or (beta_0 is None)
 		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
 		or (swap_attempt_step is None )
@@ -478,19 +479,77 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		or (learning_rate is None)
 		or (n_epochs is None)
 		or (batch_size is None)
-		or (noise_type is None)):
+		or (noise_type is None)
+		or (proba_coeff is None)):
 		raise InvalidExperimentValueError(nones)
-
+	#or (optimizer is None or optimizer not in ['PTLD'])
+	#or (surface_view is None or surface_view not in ['energy', 'info'])
 	name = architecture_name + '_' + dataset + '_'
 	name = name + str(temp_ratio) + '_' + optimizer + '_'
 	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
 	name = name + surface_view + '_' + str(beta_0) + '_' 
 	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
 	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + str(batch_size) + '_'
-	name = name + str(noise_type.replace('_', '')) + '_' + version
+	name = name + str(noise_type.replace('_', '')) + '_' +str(proba_coeff) + '_' + version
 
 	return name 
 
+def get_value_from_name(full_name, value):
+	"""Works for names v7 and higher."""
+	
+	if value == 'architecture_name':
+		return full_name.split('_')[0]
+
+	elif value == 'dataset':
+		return full_name.split('_')[1]
+
+	elif value == 'temp_ratio':
+		return full_name.split('_')[2]
+
+	#elif value == 'optimizer':
+	#	full_name.split('_')[3]
+
+	elif value == 'do_swaps':
+		return full_name.split('_')[3]
+
+	elif value == 'swap_proba':
+		return full_name.split('_')[4]
+
+	elif value == 'n_replicas':
+		return full_name.split('_')[5]
+
+	#elif value == 'surface_view':
+	#	return full_name.split('_')[7]
+
+	elif value == 'beta_0':
+		return full_name.split('_')[6]
+
+	elif value == 'loss_func_name':
+		return full_name.split('_')[7]
+
+	elif value == 'swap_attempt_step':
+		return full_name.split('_')[8]
+
+	elif value == 'burn_in_period':
+		return full_name.split('_')[9]
+
+	elif value == 'learning_rate':
+		return full_name.split('_')[10]
+
+	elif value == 'n_epochs':
+		return full_name.split('_')[11]
+
+	elif value == 'batch_size':
+		return full_name.split('_')[12]
+
+	elif value == 'noise_type':
+		return full_name.split('_')[13]
+
+	elif value == 'proba_coeff':
+		full_name.split('_')[14]
+
+	else:
+		raise ValueError('Invalid value')
 
 def clean_dirs(dir_):
     """Recursively removes all train, test and validation summary files \

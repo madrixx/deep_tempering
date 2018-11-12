@@ -309,23 +309,46 @@ class SummaryExtractor(object):
 		fig.set_size_inches(12, 4.5) # (width, height)
 		return fig
 
+
+
+	def _get_key(self, n):
+		keys = [float("{0:.5f}".format(b)) 
+			for b in self.get_description()['noise_list']]
+		return keys[int(np.argmin([abs(k-n) for k in keys]))]
+
 	def plot_mixing_between_replicas(self, mixing_log_y=None, dataset_type='train', simulation_num=0):
 		plot = Plot()
 		fig, ax = plt.subplots()
 
-
+		noise_list = self.get_description()['noise_list']
+		key_map = {self._get_key(n):i+1 for i, n in enumerate(noise_list)}
 		
 		for r in range(self._n_replicas):
 
 			x, y = self.get_summary('noise', ordered=False, dataset_type=dataset_type, 
 				simulation_num=simulation_num, replica_num=r)
-			plot.plot(x, y, fig=fig, ax=ax, label='replica_' + str(r), splined_points_mult=None)
-		log_y = (self.get_description()['temp_factor']
-			if self.get_description()['noise_type'] == 'betas' else None)
-		log_y = (mixing_log_y if mixing_log_y is not None else None)
+		
+
+			
+
+			
+
+			y_new = [key_map[self._get_key(i)] for i in y]
+
+			
+
+			plot.plot(x, y_new, fig=fig, ax=ax, label='replica_' + str(r), splined_points_mult=None)
+		
+		yticks_names = ["{0:.3f}".format(b) for b in noise_list]
+		ax.yaxis.set_ticklabels([yticks_names[0]] + yticks_names)
+		#ax.yaxis.set_ticklabels(range(9))
+		#print(yticks_names)
+		#log_y = (self.get_description()['temp_factor']
+			#if self.get_description()['noise_type'] == 'betas' else None)
+		#log_y = (mixing_log_y if mixing_log_y is not None else None)
+			
 		plot.legend(fig, ax, legend_title='replica number', xlabel='STEP',
-			ylabel='NOISE VALUE', title='mixing between replicas',
-			log_y=log_y)
+			ylabel='NOISE VALUE', title='mixing between replicas',)
 
 		return fig
 

@@ -82,7 +82,8 @@ class InvalidExperimentValueError(Exception):
 		msg = msg + "learning_rate: float\n"
 		msg = msg + "n_epochs: int pr str\n"
 		msg = msg + "batch_size: int or str\n"
-		msg = msg + "noise_type: see InvalidNoiseTypeError for available noise vals"
+		msg = msg + "noise_type: see InvalidNoiseTypeError for available noise vals\n"
+		msg = msg + "proba_coeff: a float."
 		self.msg = msg
 
 	def __str__(self):
