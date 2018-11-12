@@ -269,9 +269,16 @@ class Simulator(object):
 	
 	def train_PTLD(self, kwargs):
 		"""Trains and swaps between replicas"""
-	
+
 		try:
 			g = self.graph
+		except AttributeError as err:
+			if not err.args: err.args=('',)
+			err.args = (err.args 
+				+ ("The GraphBuilder object is not initialized.",))
+			raise
+
+		try:
 			train_data = kwargs.get('train_data', None)
 			train_labels = kwargs.get('train_labels', None)
 			test_data = kwargs.get('test_data', None)
@@ -288,7 +295,7 @@ class Simulator(object):
 					'y':train_labels
 					}).batch(self.batch_size)
 				iterator = data.make_initializable_iterator()
-		
+	
 		except:
 			raise
 
@@ -297,6 +304,7 @@ class Simulator(object):
 			step = 0
 			
 			with tf.Session() as sess:
+				
 				sess.run(iterator.initializer)
 				sess.run(g.variable_initializer)
 				next_batch = iterator.get_next()
