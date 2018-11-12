@@ -30,7 +30,7 @@ class GraphBuilder(object):
 	This object stores all copies of the systems at different 
 	temperatures and provides an API for performing the 
 	exchanges between two ensembles and storing the summary 
-	values. This class is used to train models in the 
+	values. It is used to train models in the 
 	Parallel Tempering framework.
 
 	"""
@@ -43,48 +43,49 @@ class GraphBuilder(object):
 		rmsprop_epsilon=1e-10):
 		"""Creates a GraphBuilder object.
 
-		architecture: A function that creates inference model (e.g. 
-			see simulation.architectures.nn_mnist_architecture)
-		learning_rate: Learning rate for optimizer
-		noise_list: A list (not np.array!) for noise/temperatures/dropout
-			values. In case of dropout (dropout_rmsprop, dropout_gd), noise_list
-			represents the values of KEEPING the neurons, and NOT the probability
-			of excluding the neurons.
-		noise_type: A string specifying the noise type and optimizer to apply.
-			Possible values could be seen at 
-			simulation.simulation_builder.graph_builder.GraphBuilder.__noise_types
-		batch_size: Batch Size
-		n_epochs: Number of epochs for each simulation
-		name: A name of the simulation. Specifies the a folder name through which 
-				a summary files can be later accessed.
-		summary_type: Specifies what summary types to store. Detailed possibilities
-			could be seen in 
-			simulation.simulation_builder.graph_builder.Summary.
-			Default is None (if None stores all summaries)
-		simulation_num: Specifies the simulation number that is currently in progress.
-			It is relevant when we simulating the same simulation multiple times. In 
-			this case, each simulation is stored in the location:
-			summaries/name/simulation_num.
-		surface_view: 'information' or 'energy'. See 
-			GraphBuilder.swap_replicas() for detailed explanation.
-		loss_func_name: A function which we want to optimize. Currently, 
-			only cross_entropy and stun (stochastic tunneling) are 
-			supported.
-		proba_coeff: The coeffecient is used in calculation of probability 
-			of swaps. Specifically, we have
-			P(accept_swap) = exp(proba_coeff*(beta_1-beta_2)(E_1-E_2))
-		rmsprop_decay: Used in  
-			simulation.simulation_builder.optimizers.RMSPropOptimizer 
-			for noise type 'dropout_rmsprop'. This value is ignored for 
-			other noise_types.
-		rmsprop_momentum: Used in  
-			simulation.simulation_builder.optimizers.RMSPropOptimizer 
-			for noise type 'dropout_rmsprop'. This value is ignored for 
-			other noise_types.
-		rmsprop_epsilon: Used in  
-			simulation.simulation_builder.optimizers.RMSPropOptimizer 
-			for noise type 'dropout_rmsprop'. This value is ignored for 
-			other noise_types.
+		Args:
+			architecture: A function that creates inference model (e.g. 
+				see simulation.architectures.nn_mnist_architecture)
+			learning_rate: Learning rate for optimizer
+			noise_list: A list (not np.array!) for noise/temperatures/dropout
+				values. In case of dropout (dropout_rmsprop, dropout_gd), noise_list
+				represents the values of KEEPING the neurons, and NOT the probability
+				of excluding the neurons.
+			noise_type: A string specifying the noise type and optimizer to apply.
+				Possible values could be seen at 
+				simulation.simulation_builder.graph_builder.GraphBuilder.__noise_types
+			batch_size: Batch Size
+			n_epochs: Number of epochs for each simulation
+			name: A name of the simulation. Specifies the a folder name through which 
+					a summary files can be later accessed.
+			summary_type: Specifies what summary types to store. Detailed possibilities
+				could be seen in 
+				simulation.simulation_builder.graph_builder.Summary.
+				Default is None (if None stores all summaries)
+			simulation_num: Specifies the simulation number that is currently in progress.
+				It is relevant when we simulating the same simulation multiple times. In 
+				this case, each simulation is stored in the location:
+				summaries/name/simulation_num.
+			surface_view: 'information' or 'energy'. See 
+				GraphBuilder.swap_replicas() for detailed explanation.
+			loss_func_name: A function which we want to optimize. Currently, 
+				only cross_entropy and stun (stochastic tunneling) are 
+				supported.
+			proba_coeff: The coeffecient is used in calculation of probability 
+				of swaps. Specifically, we have
+				P(accept_swap) = exp(proba_coeff*(beta_1-beta_2)(E_1-E_2))
+			rmsprop_decay: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
+			rmsprop_momentum: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
+			rmsprop_epsilon: Used in  
+				simulation.simulation_builder.optimizers.RMSPropOptimizer 
+				for noise type 'dropout_rmsprop'. This value is ignored for 
+				other noise_types.
 		"""
 
 		self.__noise_types = ['random_normal', 'ldsampler', 'betas',
@@ -169,7 +170,8 @@ class GraphBuilder(object):
 		self.ordered_swap_ratio = {i:0.0 for i in range(self._n_replicas)}
 		self.replica_n_swap_attempts = {i:0 for i in range(self._n_replicas)}
 		self.ordered_n_swap_attempts = {i:0 for i in range(self._n_replicas)}
-		
+
+		# set loss function and optimizer
 		with self._graph.as_default():
 			for i in range(self._n_replicas):
 				
@@ -211,8 +213,6 @@ class GraphBuilder(object):
 					else:
 						raise InvalidNoiseTypeError(noise_type, self.__noise_types)
 					
-					
-					
 					self._optimizer_dict[i] = optimizer
 
 					if (self._loss_func_name == 'cross_entropy' or 
@@ -229,7 +229,8 @@ class GraphBuilder(object):
 						raise ValueError('Invalid loss function name. ',
 							'Available functions are: cross_entropy/zero_one_loss/stun,',
 							'But given:', self._loss_func_name)
-			
+
+			# The Summary objects helps store summaries
 			self._summary = Summary(self._graph, self._n_replicas, self._name, 
 				self._cross_entropy_loss_dict, self._zero_one_loss_dict, 
 				self._stun_loss_dict, self._noise_list, 
@@ -248,7 +249,7 @@ class GraphBuilder(object):
 			dataset_type: 'train', 'test' or 'validation'
 		
 		Returns:
-			A dictionary to feed into session run.
+			A dictionary to feed into session's run.
 			If dataset_type=='train', adds to feed_dict placeholders 
 			to store noise (for summary).
 			If dataset_type=='validation'/'test', then doesn't add 
@@ -322,11 +323,22 @@ class GraphBuilder(object):
 			raise InvalidDatasetTypeError()
 
 	def add_summary(self, evaluated, step, dataset_type='train'):
-		"""Wrapper for tf.summary.FileWriter.add_summary.
+		"""Adds summary using Summary class object.
+
+		### Usage:
+		
+		```python
+		# Suppose g is a GraphBuilder object and step that is 
+		# incremented after each mini-batch.
+		# Evaluate train data and store computed values:
+		evaluated = sess.run(g.get_train_ops(dataset_type='train'))
+		g.add_summary(evaluated, step, dataset_type='train')
+		```
 
 		Args:
-			evaluated: A list returned by sess.run(get_train_ops())
-			step: A step for tf.summary.FileWriter.add_summary()
+			evaluated: A list returned by `sess.run(get_train_ops())`
+			step: A step for tf.summary.FileWriter.add_summary(). A
+				value that is incremented after each mini-batch.
 			dataset_type: One of 'train'/'test'/'validation'
 
 		"""
@@ -336,11 +348,16 @@ class GraphBuilder(object):
 	def extract_evaluated_tensors(self, evaluated, tensor_type):
 		"""Extracts tensors from a list of tensors evaluated by tf.Session.
 
-		Example:
-		# evaluated = sess.run(get_train_ops(dataset_type='test'), 
-		#	feed_dict=feed_dict)
-		# cross_entropy = extract_evaluated_tensors(evaluated, 'cross_entropy')
-		# summary = sess.run(get_train_ops(dataset_type='test'), 'summary')
+		### Usage:
+
+		```python
+		# Suppose g is a GraphBuilder object.
+		# Run and print cross entropy loss vals for each replica for test data:
+		evaluated = sess.run(g.get_train_ops(dataset_type='test'))
+		loss_vals = g.extract_evaluated_tensors(evaluated, 
+			tensor_type='cross_entropy')
+		print(loss_vals)
+		```
 
 		Args:
 			evaluated: A list returned by sess.run(get_train_ops())
@@ -371,31 +388,6 @@ class GraphBuilder(object):
 				return evaluated[3*self._n_replicas:end_mult*self._n_replicas + 1]
 		else:
 			raise InvalidLossFuncError() 
-
-	def update_noise_vals(self, evaluated):
-		"""This function will be removed..."""
-		
-		"""Updates noise values based on loss function.
-
-		If the noise_type is random_normal then the optimizaiton 
-		route is updated. If noise_type is dropout, then the dropout
-		placeholders are updated.
-
-		Args:
-			evaluated: a list as returned by sess.run(get_train_ops())
-		"""
-
-		loss_list = self.extract_evaluated_tensors(evaluated, 'cross_entropy')
-		losses_and_ids = [(l, i) for i, l in enumerate(loss_list)]
-		
-		losses_and_ids.sort(key=lambda x: x[0])
-		
-		for i, li in enumerate(losses_and_ids):
-			self._curr_noise_dict[li[1]] = self._noise_list[i]
-		
-		if self._noise_type == 'random_normal':
-			for i, li in enumerate(losses_and_ids):
-				self._optimizer_dict[li[1]].set_train_route(i)
 
 	def swap_replicas(self, evaluated):
 		"""Swaps between replicas.
@@ -510,10 +502,30 @@ class GraphBuilder(object):
 
 		return stun
 
+	def update_noise_vals(self, evaluated):
+		"""This function will be removed..."""
+		
+		"""Updates noise values based on loss function.
 
-	
+		If the noise_type is random_normal then the optimizaiton 
+		route is updated. If noise_type is dropout, then the dropout
+		placeholders are updated.
 
+		Args:
+			evaluated: a list as returned by sess.run(get_train_ops())
+		"""
 
+		loss_list = self.extract_evaluated_tensors(evaluated, 'cross_entropy')
+		losses_and_ids = [(l, i) for i, l in enumerate(loss_list)]
+		
+		losses_and_ids.sort(key=lambda x: x[0])
+		
+		for i, li in enumerate(losses_and_ids):
+			self._curr_noise_dict[li[1]] = self._noise_list[i]
+		
+		if self._noise_type == 'random_normal':
+			for i, li in enumerate(losses_and_ids):
+				self._optimizer_dict[li[1]].set_train_route(i)
 	
 
 
