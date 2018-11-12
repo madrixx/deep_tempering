@@ -41,6 +41,51 @@ class GraphBuilder(object):
 		surface_view='energy', loss_func_name='cross_entropy',
 		proba_coeff=1.0, rmsprop_decay=0.9, rmsprop_momentum=0.0, 
 		rmsprop_epsilon=1e-10):
+		"""Creates a GraphBuilder object.
+
+		architecture: A function that creates inference model (e.g. 
+			see simulation.architectures.nn_mnist_architecture)
+		learning_rate: Learning rate for optimizer
+		noise_list: A list (not np.array!) for noise/temperatures/dropout
+			values. In case of dropout (dropout_rmsprop, dropout_gd), noise_list
+			represents the values of KEEPING the neurons, and NOT the probability
+			of excluding the neurons.
+		noise_type: A string specifying the noise type and optimizer to apply.
+			Possible values could be seen at 
+			simulation.simulation_builder.graph_builder.GraphBuilder.__noise_types
+		batch_size: Batch Size
+		n_epochs: Number of epochs for each simulation
+		name: A name of the simulation. Specifies the a folder name through which 
+				a summary files can be later accessed.
+		summary_type: Specifies what summary types to store. Detailed possibilities
+			could be seen in 
+			simulation.simulation_builder.graph_builder.Summary.
+			Default is None (if None stores all summaries)
+		simulation_num: Specifies the simulation number that is currently in progress.
+			It is relevant when we simulating the same simulation multiple times. In 
+			this case, each simulation is stored in the location:
+			summaries/name/simulation_num.
+		surface_view: 'information' or 'energy'. See 
+			GraphBuilder.swap_replicas() for detailed explanation.
+		loss_func_name: A function which we want to optimize. Currently, 
+			only cross_entropy and stun (stochastic tunneling) are 
+			supported.
+		proba_coeff: The coeffecient is used in calculation of probability 
+			of swaps. Specifically, we have
+			P(accept_swap) = exp(proba_coeff*(beta_1-beta_2)(E_1-E_2))
+		rmsprop_decay: Used in  
+			simulation.simulation_builder.optimizers.RMSPropOptimizer 
+			for noise type 'dropout_rmsprop'. This value is ignored for 
+			other noise_types.
+		rmsprop_momentum: Used in  
+			simulation.simulation_builder.optimizers.RMSPropOptimizer 
+			for noise type 'dropout_rmsprop'. This value is ignored for 
+			other noise_types.
+		rmsprop_epsilon: Used in  
+			simulation.simulation_builder.optimizers.RMSPropOptimizer 
+			for noise type 'dropout_rmsprop'. This value is ignored for 
+			other noise_types.
+		"""
 
 		self.__noise_types = ['random_normal', 'ldsampler', 'betas',
 		'dropout', 'dropout_rmsprop', 'dropout_gd'] # possible noise types
@@ -150,7 +195,6 @@ class GraphBuilder(object):
 							self._learning_rate, i, self._noise_list)
 
 					elif noise_type.lower() == 'ldsampler':
-
 						optimizer = LDSampler(self._learning_rate,
 							i, self._noise_list)
 					
@@ -174,10 +218,13 @@ class GraphBuilder(object):
 					if (self._loss_func_name == 'cross_entropy' or 
 						self._loss_func_name == 'crossentropy'):
 						optimizer.minimize(self._cross_entropy_loss_dict[i])
+					
 					elif self._loss_func_name == 'zero_one_loss':
 						optimizer.minimize(self._zero_one_loss_dict[i])
+					
 					elif self._loss_func_name == 'stun':
 						optimizer.minimize(self._stun_loss_dict[i])
+					
 					else:
 						raise ValueError('Invalid loss function name. ',
 							'Available functions are: cross_entropy/zero_one_loss/stun,',
