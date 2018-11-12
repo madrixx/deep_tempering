@@ -54,6 +54,7 @@ class Simulator(object):
 	burn_in_period = 400
 	loss_func_name = 'cross_entropy'
 	description = 'RMSProp with dropout.'
+	proba_coeff = 250
 	rmsprop_decay = 0.9
 	rmsprop_momentum = 0.001
 	rmsprop_epsilon=1e-6
@@ -72,15 +73,16 @@ class Simulator(object):
 		noise_type='dropout_rmsprop',
 		batch_size=batch_size,
 		n_epochs=n_epochs,
-	    test_step=test_step,
+		test_step=test_step,
 		name=name,
 		swap_attempt_step=swap_attempt_step,
 		burn_in_period=burn_in_period,
 		loss_func_name='cross_entropy',
-	    description=description,
-	    rmsprop_decay=rmsprop_decay,
-	    rmsprop_epsilon=rmsprop_epsilon,
-	    rmsprop_momentum=rmsprop_momentum
+		description=description,
+		proba_coeff=proba_coeff,
+		rmsprop_decay=rmsprop_decay,
+		rmsprop_epsilon=rmsprop_epsilon,
+		rmsprop_momentum=rmsprop_momentum
 		)
 
 	sim.train(train_data=train_data, train_labels=train_labels,
@@ -99,7 +101,7 @@ class Simulator(object):
 		batch_size, n_epochs, name, n_simulations=1, summary_type=None, 
 		test_step=500, swap_attempt_step=500, temp_factor=None, 
 		tuning_parameter_name=None, burn_in_period=None, 
-		loss_func_name='cross_entropy', 
+		loss_func_name='cross_entropy', proba_coeff=1.0,
 		surface_view='energy', description=None,
 		rmsprop_decay=0.9, rmsprop_momentum=0.001, rmsprop_epsilon=1e-6):
 		"""Creates a new simulator object.
@@ -138,6 +140,9 @@ class Simulator(object):
 			loss_func_name: A function which we want to optimize. Currently, 
 				only cross_entropy and stun (stochastic tunneling) are 
 				supported.
+			proba_coeff: The coeffecient is used in calculation of probability 
+				of swaps. Specifically, we have
+				P(accept_swap) = exp(proba_coeff*(beta_1-beta_2)(E_1-E_2))
 			surface_view: 'information' or 'energy'. See 
 				GraphBuilder.swap_replicas() for detailed explanation.
 			description: A custom string that is stored in the description file.
@@ -167,7 +172,7 @@ class Simulator(object):
 		self.n_simulations = n_simulations
 		self.burn_in_period = burn_in_period 
 		self.loss_func_name = loss_func_name
-			
+		self.proba_coeff = proba_coeff
 
 		self.batch_size = batch_size
 		self.n_epochs = n_epochs
@@ -190,7 +195,7 @@ class Simulator(object):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=0, surface_view=self.surface_view,
-				loss_func_name=self.loss_func_name,
+				loss_func_name=self.loss_func_name, proba_coeff=self.proba_coeff,
 				rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
 				rmsprop_epsilon=self.rmsprop_epsilon)
 		
@@ -221,7 +226,7 @@ class Simulator(object):
 			self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 				self.noise_list, self.name, self.noise_type, 
 				self.summary_type, simulation_num=i, surface_view=self.surface_view,
-				loss_func_name=self.loss_func_name,
+				loss_func_name=self.loss_func_name, proba_coeff=self.proba_coeff,
 				rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
 				rmsprop_epsilon=self.rmsprop_epsilon)
 			
@@ -245,7 +250,7 @@ class Simulator(object):
 				self.graph = GraphBuilder(self.architecture, self.learning_rate, 
 					noise_list, self.name, self.noise_type, 
 					self.summary_type, simulation_num=i, surface_view=self.surface_view,
-					loss_func_name=self.loss_func_name,
+					loss_func_name=self.loss_func_name, proba_coeff=self.proba_coeff,
 					rmsprop_decay=self.rmsprop_decay, rmsprop_momentum=self.rmsprop_momentum, 
 					rmsprop_epsilon=self.rmsprop_epsilon)
 			
@@ -364,7 +369,8 @@ class Simulator(object):
 			'tuning_parameter_name':self.tuning_parameter_name,	
 			'surface_view':self.surface_view,
 			'description':desciption,
-			'burn_in_period':self.burn_in_period
+			'burn_in_period':self.burn_in_period,
+			'proba_coeff':self.proba_coeff
 
 		}
 		with open(filepath, 'w') as fo:

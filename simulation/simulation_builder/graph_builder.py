@@ -39,7 +39,8 @@ class GraphBuilder(object):
 	def __init__(self, architecture, learning_rate, noise_list, name, 
 		noise_type='random_normal', summary_type=None, simulation_num=None, 
 		surface_view='energy', loss_func_name='cross_entropy',
-		rmsprop_decay=0.9, rmsprop_momentum=0.0, rmsprop_epsilon=1e-10):
+		proba_coeff=1.0, rmsprop_decay=0.9, rmsprop_momentum=0.0, 
+		rmsprop_epsilon=1e-10):
 
 		self.__noise_types = ['random_normal', 'ldsampler', 'betas',
 		'dropout', 'dropout_rmsprop', 'dropout_gd'] # possible noise types
@@ -60,6 +61,7 @@ class GraphBuilder(object):
 		self._summary_type = summary_type
 		self._simulation_num = '' if simulation_num is None else str(simulation_num)
 		self._loss_func_name = loss_func_name
+		self._proba_coeff = proba_coeff
 		
 		# create graph with duplicated ensembles based on the provided
 		# architecture function and noise type 
@@ -394,7 +396,7 @@ class GraphBuilder(object):
 		else:
 			raise ValueError('Invalid surface view.')
 		
-		accept_proba = np.exp((l1-l2)*(beta[i] - beta[j]))
+		accept_proba = np.exp(self._proba_coeff*(l1-l2)*(beta[i] - beta[j]))
 		self.latest_accept_proba = accept_proba
 		
 
