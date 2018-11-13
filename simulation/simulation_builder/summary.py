@@ -9,9 +9,61 @@ def sort_py_func(a):
     return a[a[:,0].argsort()]
 
 class Summary(object):
+	"""Helper class for storing summaries.
+
+	It is a wrapper for tensorflow tf.Summary class. It creates 3
+	writers (tf.Summary.FileWriter objects) for train. test, 
+	validation dataset - two writers for each. First writer stores
+	the values for each replica (e.g. train_replica) and the second
+	one stores the values for each replica in sorted form (e.g. 
+	train_ordered). The seventh writer is for the rest of the values 
+	such as diffusion, acceptantce ratio for each replica and 
+	acceptance ratio for each sorted replica as well.
+	"""
+
 	def __init__(self, graph, n_replicas, name, loss_dict, zero_one_loss_dict, 
 		stun_loss_dict, noise_list, noise_plcholders, simulation_num, 
 		optimizer_dict, summary_type=None):
+		"""Creates a new Summary object for helping to store summaries.
+
+		Args:
+			graph: A tensorflow Graph object.
+			n_replicas: A number of replicas.
+			name: The name of the graph object. This arguments defines 
+				the directory name where all summaries will be stored.
+			loss_dict: Cross Entropy loss dict, where each key is a 
+				replica_id number and the value is a cross entropy loss.
+			zero_on_loss_dict: 0-1 loss dict, where each key is a 
+				replica_id number and the value is a 0-1 loss.
+			stun_loss_dict: STUN loss dict, where each key is a 
+				replica_id number and the value is a STUN loss.
+			noise_list: Same list accepted by GraphBuilder object.
+			noise_pcholders: A dict of key - `replica_id`, value - 
+				noise placeholder that stores current value of noise
+				for each replica.
+			simulation_num: The number of current simulation. This 
+				allows to perform multiple simulations with the 
+				same parameters for taking sample averages. Each such 
+				simulation is stored in the separated folder inside
+				`summaries/<name>/<simulation_num>` folder.
+			optimizer_dict: A dict mapping `replica_id` to optimizer, 
+				where optimizer is the one of the objects defined in
+				simulation.simulation_builder.optimizer file. Here, 
+				it is used for calculating the distance (diffusion) 
+				that each replica does during training (optimizer 
+				object stores initial values of each trainable 
+				variable).
+			summary_type: One of 'replica_summary'/'ordered_summary'.
+				If `replica_summary`, stores values for each replica.
+				If `ordered_summary`, the values for each replica in 
+				ordered form.
+				If None, stores both.
+				
+				UPDATE: Should be None all the time, because 
+				SummaryExtractor object uses both. Otherwise, the 
+				extraction of summaries must be implemented differently.
+
+		"""
 
 		self.graph = graph
 		self.n_replicas = n_replicas
@@ -21,7 +73,7 @@ class Summary(object):
 		self.stun_loss_dict = stun_loss_dict
 		self.noise_list = noise_list
 		self.noise_plcholders = noise_plcholders
-		self.optimizer_dict = optimizer_dict # diffusion summary 
+		self.optimizer_dict = optimizer_dict # for diffusion summary 
 		self.swap_accept_ratio_plcholder = tf.placeholder(tf.float32, shape=[]) 
 		self.accept_proba_plcholder = tf.placeholder(tf.float32, shape=[])
 		self.swap_replica_pair_plcholder = tf.placeholder(tf.int8, shape=[])
@@ -65,7 +117,7 @@ class Summary(object):
 		if (summary_type is None 
 			or summary_type == 'ordered_summary'):
 			self.create_ordered_summary()
-		self.create_diffusion_vals() # MUST BE CALLED BEFORE special_summary
+		self.create_diffusion_vals() # must be called BEFORE special_summary
 		self.create_special_summary()
 		
 	def create_diffusion_vals(self):
@@ -146,7 +198,6 @@ class Summary(object):
 
 	def create_replica_summary(self,):
 		
-		
 		for i in range(self.n_replicas):
 			with tf.name_scope('replica_summary_' + str(i)):
 				train_collect = ['train'+str(i)]
@@ -183,6 +234,7 @@ class Summary(object):
 					filename_suffix=self.dir.get_filename_suffix())
 
 	def create_ordered_summary(self, ):
+
 		loss = self.loss_dict
 		acc = self.zero_one_loss_dict
 		stun = self.stun_loss_dict
@@ -240,11 +292,11 @@ class Summary(object):
 		Args:
 			dataset_type: One of `train`, `test`, `validation`.
 
-		Raises:
-			InvalidDatasetTypeError if `dataset_type` is incorrect.
-
 		Returns:
 			Summary ops 
+
+		Raises:
+			InvalidDatasetTypeError if `dataset_type` is incorrect.
 		"""
 		summs = []
 		N = self.n_replicas
@@ -316,12 +368,12 @@ class Summary(object):
 				summary that stores metrics for each replica but in 
 				sorted form (best loss is 0, second best is 1 etc.)
 		
+		Returns:
+			Summary writer
+
 		Raises:
 			InvalidDatasetTypeError if `dataset_type` is incorrect. 
 			ValueError if `summary_type` is incorrect.
-
-		Returns:
-			Summary writer
 
 		"""
 
@@ -348,12 +400,14 @@ class Summary(object):
 				ordered_summary'""")
 
 	def flush_summary_writer(self):
+		"""Wrapper for flush() function of tf.summary.FileWriter"""
 		for i in self.writer_dict:
 			for k in self.writer_dict[i]:
 				self.writer_dict[i][k].flush()
 		self.special_writer.flush()
 
 	def close_summary_writer(self):
+		"""Wrapper for close() function of tf.summary.FileWriter"""
 		for i in self.writer_dict:
 			for k in self.writer_dict[i]:
 				self.writer_dict[i][k].close()
