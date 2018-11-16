@@ -9,6 +9,7 @@ import json
 import pickle
 import pandas as pd
 import re
+import csv
 
 from simulation.simulation_builder.summary import Dir
 from simulation.simulator_exceptions import InvalidExperimentValueError
@@ -444,11 +445,10 @@ def extract_and_remove_simulation(path):
 
 
 def generate_experiment_name(architecture_name=None, dataset='mnist', 
-	temp_ratio=None, do_swaps=True, 
-	swap_proba='boltzmann', n_replicas=None, beta_0=None, 
+	temp_ratio=None, do_swaps=True, n_replicas=None, beta_0=None, 
 	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
 	learning_rate=None, n_epochs=None, noise_type=None, batch_size=None, 
-	proba_coeff=1.0, version='v6'):
+	proba_coeff=1.0, version='v7'):
 	
 	
 	"""Experiment name:
@@ -462,17 +462,17 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 		version: 'v5' has n_epochs in it
 		version: 'v6' has batch_size and noise_type
 		version: 'v7' has proba coefficient + optimizer has been removed
-			+ surface_view has been removed
+			+ surface_view + swap_proba has been removed
 	"""
 	
-	nones = [(x, y) for x, y in zip(locals().keys(), locals().values()) if y is None]	
+	nones = [(x, y) for x, y in zip(locals().keys(), locals().values()) if y is None]
+	loss_func_name = loss_func_name.replace('_', '')	
 
 	if ((architecture_name is None or type(architecture_name) != str) 
 		or (dataset is None or  dataset not in ['mnist', 'cifar'])
 		or (temp_ratio is None) 
 		
 		or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
-		or (swap_proba is None or swap_proba not in ['boltzmann'])
 		or (n_replicas is None)
 		or (beta_0 is None)
 		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
@@ -487,9 +487,9 @@ def generate_experiment_name(architecture_name=None, dataset='mnist',
 	#or (optimizer is None or optimizer not in ['PTLD'])
 	#or (surface_view is None or surface_view not in ['energy', 'info'])
 	name = architecture_name + '_' + dataset + '_'
-	name = name + str(temp_ratio) + '_' + optimizer + '_'
-	name = name + str(do_swaps) + '_' + str(swap_proba) + '_' + str(n_replicas) + '_'
-	name = name + surface_view + '_' + str(beta_0) + '_' 
+	name = name + str(temp_ratio) + '_' 
+	name = name + str(do_swaps) + '_' + str(n_replicas) + '_'
+	name = name + str(beta_0) + '_' 
 	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
 	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + str(batch_size) + '_'
 	name = name + str(noise_type.replace('_', '')) + '_' +str(proba_coeff) + '_' + version
@@ -514,41 +514,38 @@ def get_value_from_name(full_name, value):
 	elif value == 'do_swaps':
 		return full_name.split('_')[3]
 
-	elif value == 'swap_proba':
-		return full_name.split('_')[4]
-
 	elif value == 'n_replicas':
-		return full_name.split('_')[5]
+		return full_name.split('_')[4]
 
 	#elif value == 'surface_view':
 	#	return full_name.split('_')[7]
 
 	elif value == 'beta_0':
-		return full_name.split('_')[6]
+		return full_name.split('_')[5]
 
 	elif value == 'loss_func_name':
-		return full_name.split('_')[7]
+		return full_name.split('_')[6]
 
 	elif value == 'swap_attempt_step':
-		return full_name.split('_')[8]
+		return full_name.split('_')[7]
 
 	elif value == 'burn_in_period':
-		return full_name.split('_')[9]
+		return full_name.split('_')[8]
 
 	elif value == 'learning_rate':
-		return full_name.split('_')[10]
+		return full_name.split('_')[9]
 
 	elif value == 'n_epochs':
-		return full_name.split('_')[11]
+		return full_name.split('_')[10]
 
 	elif value == 'batch_size':
-		return full_name.split('_')[12]
+		return full_name.split('_')[11]
 
 	elif value == 'noise_type':
-		return full_name.split('_')[13]
+		return full_name.split('_')[12]
 
 	elif value == 'proba_coeff':
-		full_name.split('_')[14]
+		full_name.split('_')[13]
 
 	else:
 		raise ValueError('Invalid value')
@@ -568,3 +565,100 @@ def clean_dirs(dir_):
     except OSError:
         # if first simulation, nothing to delete
         return
+
+
+class GlobalDescriptor(object):
+	def __init__(self):
+		self.delim = "\\" if 'win' in sys.platform else '/'
+		current_dir = self.delim.join(os.path.abspath(__file__).split(self.delim)[:-1])
+		self.summaries_dir = os.path.join(current_dir, 'summaries')
+		self.logfile_path = os.path.join(self.summaries_dir, 'test_logs.csv')
+		"""
+		self.columns = ['surface_view', 'learning_rate', 'noise_type', 
+		'n_simulations', 'batch_size', 'noise_list', 'description', 
+		'n_replicas', 'n_epochs', 'swap_attempt_step', 
+		'burn_in_period', 'proba_coeff', 'name', 
+		'tuning_parameter_name', 'temp_factor']
+		"""
+
+		self.columns = [
+			'model_name',
+			'noise_type',
+			'n_epochs',
+			'learning_rate',
+			'n_replicas',
+			'swap_attempt_step',
+			'temp_factor',
+			'beta_0',
+			'burn_in_period',
+			'proba_coeff',
+			'batch_size',
+			'cross_entropy',
+			'zero_one',
+			'accept_ratio',
+			'travel_time',
+			'part_mix_ratio',
+			'mix_ratio',
+
+
+			]
+
+	def add_row(self, filename):
+		se = SummaryExtractor(filename)
+		d = se.get_description()
+		vals = [
+			filename.split('_')[0],
+			d['noise_type'],
+			d['n_epochs'],
+			d['learning_rate'],
+			d['n_replicas'],
+			d['swap_attempt_step'],
+			d['temp_factor'],
+			d['noise_list'][0],
+			d['burn_in_period'],
+			d['proba_coeff'],
+			d['batch_size'],
+			]
+
+		xentropy = se.get_min_val('0/test_ordered_0/cross_entropy')
+		v = float("{0:.4f}".format(xentropy[1]))
+		vals = vals + [(v, int(xentropy[0]))]
+
+		zero_one = se.get_min_val('0/test_ordered_0/zero_one_loss')
+		v = float("{0:.4f}".format(zero_one[1]))
+		vals = vals + [(v, int(zero_one[0]))]
+
+		sep, acc, err = se.get_accept_ratio_vs_separation_ratio_data()
+		acc = float("{0:.4f}".format(acc))
+		err = float("{0:.4f}".format(err))
+		vals = vals + [str(acc) + '+/-' + str(err)]
+
+		t_time, sep_ratio, err = se.get_travel_time_vs_separation_ratio_data()
+		v = float("{0:.4f}".format(t_time))
+		err = float("{0:.4f}".format(err))
+		vals = vals + [str(v) + '+/-' + str(err)]
+
+		part_mix_ratio = float("{0:.4f}".format(se._get_partial_mixing_ratio_data()))
+		vals = vals + [part_mix_ratio]
+		
+
+		mix_ratio = float("{0:.4f}".format(se._get_mixing_ratio_data()))
+		vals = vals + [mix_ratio]
+
+		
+		
+
+		if not os.path.exists(self.logfile_path):
+			with open(self.logfile_path, 'w') as fo:
+				writer = csv.writer(fo)
+				writer.writerow(self.columns)
+
+		with open(self.logfile_path, 'a') as fo:
+			writer = csv.writer(fo)
+			writer.writerow(vals)
+
+	def get_dataframe(self):
+		df = pd.read_csv(self.logfile_path)
+		return df
+
+

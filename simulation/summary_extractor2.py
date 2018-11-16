@@ -20,15 +20,17 @@ from simulation.simulation_builder.summary import Dir
 from simulation.simulator_exceptions import InvalidExperimentValueError
 from math import isinf
 
-class ExperimentExtractor(object):
 
-	def __init__(self, experiment_names):
+
+class ExperimentExtractor_v2(object):
+	"""No verification of input."""
+	def __init__(self, experiment_names, max_step=None):
 		names = list(set(['_'.join(e.split('_')[:-1])
 			for e in experiment_names]))
-		if (len(names) > 1) and (len(list(set(['_'.join(e.split('_')[:-1]) for e in names]))) > 1):
+		#if (len(names) > 1) and (len(list(set(['_'.join(e.split('_')[:-1]) for e in names]))) > 1):
 
-			raise ValueError('Simulations must be from the same experiments, but given:',
-				names)
+		#	raise ValueError('Simulations must be from the same experiments, but given:',
+		#		names)
 
 		try:
 			self._name = names[0]
@@ -36,7 +38,7 @@ class ExperimentExtractor(object):
 			print(names)
 			print(experiment_names)
 			raise
-		self._se = {e:SummaryExtractor(e)
+		self._se = {e:SummaryExtractor(e, max_step)
 			for e in experiment_names}
 
 	def __str__(self):
@@ -76,6 +78,169 @@ class ExperimentExtractor(object):
 		
 		return list(x), list(y)
 
+	def get_partial_mixing_ratio_vs_separation_ratio_data(self):
+		sep_ratio = []
+		mixing_ratio = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			mix, sep = se.get_partial_mixing_ratio_vs_separation_ratio_data()
+			sep_ratio.append(sep)
+			mixing_ratio.append(mix)
+
+		x, y = zip(*sorted(zip(sep_ratio, mixing_ratio)))
+		
+		return list(x), list(y)
+
+	def get_min_loss_value_vs_separation_ratio_data(self):
+		sep_ratio = []
+		min_vals = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			min_val, sep, err = se.get_min_loss_value_vs_separation_ratio_data()
+			min_vals.append(min_val)
+			sep_ratio.append(sep)
+
+		x, y = zip(*sorted(zip(sep_ratio, min_vals)))
+
+		return list(x), list(y)
+
+	def get_travel_time_vs_separation_ratio_data(self, inf_travel_time=1000):
+		sep_ratio = []
+		travel_times = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			t_time, sep, err = se.get_travel_time_vs_separation_ratio_data()
+			travel_times.append(t_time)
+			sep_ratio.append(sep)
+
+
+		x, y = zip(*sorted(zip(sep_ratio, travel_times)))
+		x_ = list(x)
+		y_ = list(y)
+		x, y = [], []
+		for i, j in zip(x_, y_):
+			if not np.isinf(j):
+				y.append(j)
+				x.append(i)
+		"""
+		for i, j in zip(x_, y_):
+			if not np.isinf(j):
+				y.append(j)
+			else:
+				y.append(inf_travel_time)
+			x.append(i)
+		"""
+		return x, y
+
+class ExperimentExtractor(object):
+
+	def __init__(self, experiment_names, max_step=None):
+		names = list(set(['_'.join(e.split('_')[:-1])
+			for e in experiment_names]))
+		if (len(names) > 1) and (len(list(set(['_'.join(e.split('_')[:-1]) for e in names]))) > 1):
+
+			raise ValueError('Simulations must be from the same experiments, but given:',
+				names)
+
+		try:
+			self._name = names[0]
+		except IndexError:
+			print(names)
+			print(experiment_names)
+			raise
+		self._se = {e:SummaryExtractor(e, max_step)
+			for e in experiment_names}
+
+	def __str__(self):
+		return self._name
+
+	def __repr__(self):
+		return self.__str__()
+
+	def get_accept_ratio_vs_separation_ratio_data(self):
+		"""Returns tuple of numpy arrays (separation_ratio, accept_ratio, stddev)"""
+		
+		sep_ratio = []
+		accept_ratio = []
+		stddev = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			sep, acc, err = se.get_accept_ratio_vs_separation_ratio_data()
+			sep_ratio.append(sep)
+			accept_ratio.append(acc)
+			stddev.append(err)
+
+		x, y, err = zip(*sorted(zip(sep_ratio, accept_ratio, stddev)))
+
+
+		return list(x), list(y), list(err)
+
+	def get_mixing_ratio_vs_separation_ratio_data(self):
+		sep_ratio = []
+		mixing_ratio = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			mix, sep = se.get_mixing_ratio_vs_separation_ratio_data()
+			sep_ratio.append(sep)
+			mixing_ratio.append(mix)
+
+		x, y = zip(*sorted(zip(sep_ratio, mixing_ratio)))
+		
+		return list(x), list(y)
+
+	def get_partial_mixing_ratio_vs_separation_ratio_data(self):
+		sep_ratio = []
+		mixing_ratio = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			mix, sep = se.get_partial_mixing_ratio_vs_separation_ratio_data()
+			sep_ratio.append(sep)
+			mixing_ratio.append(mix)
+
+		x, y = zip(*sorted(zip(sep_ratio, mixing_ratio)))
+		
+		return list(x), list(y)
+
+	def get_min_loss_value_vs_separation_ratio_data(self):
+		sep_ratio = []
+		min_vals = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			min_val, sep, err = se.get_min_loss_value_vs_separation_ratio_data()
+			min_vals.append(min_val)
+			sep_ratio.append(sep)
+
+		x, y = zip(*sorted(zip(sep_ratio, min_vals)))
+
+		return list(x), list(y)
+
+	def get_travel_time_vs_separation_ratio_data(self, inf_travel_time=1000):
+		sep_ratio = []
+		travel_times = []
+		for se_name in self._se:
+			se = self._se[se_name]
+			t_time, sep, err = se.get_travel_time_vs_separation_ratio_data()
+			travel_times.append(t_time)
+			sep_ratio.append(sep)
+
+
+		x, y = zip(*sorted(zip(sep_ratio, travel_times)))
+		x_ = list(x)
+		y_ = list(y)
+		x, y = [], []
+		for i, j in zip(x_, y_):
+			if not np.isinf(j):
+				y.append(j)
+				x.append(i)
+		"""
+		for i, j in zip(x_, y_):
+			if not np.isinf(j):
+				y.append(j)
+			else:
+				y.append(inf_travel_time)
+			x.append(i)
+		"""
+		return x, y
 
 
 
@@ -166,13 +331,15 @@ class Plot(object):
 
 class SummaryExtractor(object):
 
-	def __init__(self, name):
+	def __init__(self, name, max_step=None):
 		
 
 		self._dir = Dir(name)
 		self.all_summs_dict = {}
 		self._description = None
 		self._mixing_ratio = None
+		self._partial_mixing_ratio = None
+		self._max_step = max_step
 		
 		for i in range(100):
 			try:
@@ -189,10 +356,78 @@ class SummaryExtractor(object):
 		self._n_simulations = self.get_description()['n_simulations']
 		self._n_replicas = len(self.get_description()['noise_list'])
 
+	def get_min_loss_value_vs_separation_ratio_data(self):
+		sep_ratio = self.get_description()['temp_factor']
+		n_simulations = self.get_description()['n_simulations']
+		min_vals = []
+
+		for i in range(n_simulations):
+			x, y = self.get_summary('cross_entropy', simulation_num=i)
+			min_vals.append(y.min())
+
+		min_val = np.mean(min_vals)
+		err = np.std(min_vals)
+
+		return min_val, sep_ratio, err
+
 	def get_mixing_ratio_vs_separation_ratio_data(self):
 		separation_ratio = self.get_description()['temp_factor']
 		mixing_ratio = self._get_mixing_ratio_data()
 		return mixing_ratio, separation_ratio
+
+	def get_partial_mixing_ratio_vs_separation_ratio_data(self):
+		separation_ratio = self.get_description()['temp_factor']
+		mixing_ratio = self._get_partial_mixing_ratio_data()
+		return mixing_ratio, separation_ratio
+
+	
+
+
+	def get_travel_time_vs_separation_ratio_data(self):
+		
+		sep_ratio = self.get_description()['temp_factor']
+		mixing_ratio = self._get_mixing_ratio_data()
+
+		if mixing_ratio == 0.0:
+			return np.inf, sep_ratio, 0.0
+
+		def all_visited(d):
+			return all(d[k]!=0 for k in d)
+
+		keys = [float("{0:.3f}".format(b)) 
+			for b in self.get_description()['noise_list']]
+		burn_in_period = self.get_description()['burn_in_period']
+		n_replicas = self.get_description()['n_replicas']
+		n_simulations = self.get_description()['n_simulations']
+
+		reps = {k:0 for k in keys}
+		travel_times = []
+
+		for s in range(n_simulations):
+			for r in range(n_replicas):
+				x, y = self.get_summary('noise', simulation_num=s,
+					replica_num=r, ordered=False, dataset_type='train')
+				n_steps = int(x.shape[0])
+				travel_time = None
+				for step in range(n_steps):
+					if (x[step] > burn_in_period
+						and travel_time is None):
+						travel_time = 0
+					elif travel_time is None:
+						continue
+					else:
+						travel_time += 1
+					reps[self._get_key(y[step])] += 1
+					if all_visited(reps):
+						travel_times.append(travel_time)
+						reps = {k:0 for k in keys}
+						travel_time = 0
+
+		travel_times_ = [t*self.get_description()['batch_size'] for t in travel_times]
+		travel_time = np.mean(travel_times_)
+		err = np.std(travel_times_)
+		return travel_time, sep_ratio, err
+
 
 	def _get_mixing_ratio_data(self):
 		"""Fraction of replicas that get to visit both lowest and highest temperatures."""
@@ -232,6 +467,48 @@ class SummaryExtractor(object):
 			ratios.append(ratio)
 		self._mixing_ratio = sum(ratios)/len(ratios) 
 		return self._mixing_ratio
+
+	def _get_partial_mixing_ratio_data(self):
+		if self._partial_mixing_ratio is not None:
+			return self._partial_mixing_ratio
+
+		keys = [float("{0:.3f}".format(b)) 
+			for b in self.get_description()['noise_list']]
+
+		def get_key(n):
+			return keys[int(np.argmin([abs(k-n) for k in keys]))]
+
+
+		reps = {k:0 for k in keys}
+		mixing = {i:[] for i in range(self._n_replicas)}
+		
+		for s in range(self._n_simulations):
+			for r in range(self._n_replicas):
+				x, y = self.get_summary('noise', simulation_num=s,
+					replica_num=r, ordered=False, dataset_type='train')
+				n_steps = int(x.shape[0])
+
+				for i in range(n_steps):
+					if x[i] > self.get_description()['burn_in_period']:
+						reps[get_key(y[i])] += 1
+				visited = [1 if reps[x]!=0 else 0
+					for x in reps ]
+				mixing[r].append(sum(visited)/len(visited))
+				
+				#if all(reps[x]!= 0 for x in reps):
+				#	mixing[r].append(1)
+				#else:
+				#	mixing[r].append(0)
+				#
+				reps = {k:0 for k in keys}
+		
+		ratios = []
+		
+		for s in range(self._n_simulations):
+			ratio = sum([mixing[r][s] for r in range(self._n_replicas)])/self._n_replicas
+			ratios.append(ratio)
+		self._partial_mixing_ratio = sum(ratios)/len(ratios) 
+		return self._partial_mixing_ratio
 
 
 	def get_accept_ratio_vs_separation_ratio_data(self):
@@ -312,7 +589,7 @@ class SummaryExtractor(object):
 
 
 	def _get_key(self, n):
-		keys = [float("{0:.5f}".format(b)) 
+		keys = [float("{0:.3f}".format(b)) 
 			for b in self.get_description()['noise_list']]
 		return keys[int(np.argmin([abs(k-n) for k in keys]))]
 
@@ -424,7 +701,19 @@ class SummaryExtractor(object):
 			print(locals())
 			raise
 
-		return np.ndarray.flatten(x), np.ndarray.flatten(y)
+		x = np.ndarray.flatten(x)
+		y = np.ndarray.flatten(y)
+
+		if self._max_step is not None:
+			i = 0
+			while (x[i] < self._max_step):
+				i += 1
+		else:
+			i = np.inf
+
+		if (i < x.shape[0]):
+			return x[:i], y[:i]
+		return x, y
 
 
 
@@ -536,14 +825,27 @@ class SummaryExtractor(object):
 		x, y = self._get_summary(summ_name)
 		return(x[y.argmin()][0], y.min()) 
 
+	def get_min_val_zero_one_loss(self):
+		x, y = self.get_summary('zero_one_loss', dataset_type='test',
+			ordered=True, simulation_num=0, replica_num=0)
+		#summ_name, dataset_type='test', ordered=True, simulation_num=0, replica_num=0
+		return (x[int(y.argmin())], y.min())
+
+	def get_min_cross_valid(self):
+		x, y = self.get_summary('cross_entropy', dataset_type='test',
+			ordered=True, simulation_num=0, replica_num=0)
+
+		return (x[int(y.argmin())], y.min())
+
 	def print_report(self, mixing_log_y=None):
 		print('Separation Ratio:', self.get_description()['temp_factor'])
 		print('Best Accuracy on test dataset:',self.get_min_val('0/test_ordered_0/zero_one_loss'))
-
+		#print('Best Accuracy on test dataset:',self.get_min_val_zero_one_loss())
 		print()
 		print('cross entropy:')
 		print('min_cross_valid_train:', self.get_min_val('0/train_ordered_0/cross_entropy'))
 		print('min_cross_valid_test:', self.get_min_val('0/test_ordered_0/cross_entropy'))
+		print('min_cross_valid_test:', self.get_min_cross_valid())
 		print('min_cross_valid_validation:', self.get_min_val('0/valid_ordered_0/cross_entropy'))
 		#print('stun:')
 		#print('min_stun_train:', self.get_min_val('0/train_ordered_0/stun'))
@@ -553,7 +855,17 @@ class SummaryExtractor(object):
 		print('Acceptance Ratio:', self._get_summary('0/special_summary/accept_ratio')[1][-1][0])
 		print()
 		print('Mixing ratio (fraction of replicas that travelled all temperatures):', self._get_mixing_ratio_data())
+		print('Average fraction of visited temperatures:', self._get_partial_mixing_ratio_data())
+		print('Burn in period:', self.get_description()['burn_in_period'])
+		t_time, sep_ratio, err = self.get_travel_time_vs_separation_ratio_data()
+		
 
+		print('Travel Time:', t_time, '+/-', err)
+		try:
+			print('Proba Coeff:', self.get_description()['proba_coeff'])
+		except KeyError:
+			pass
+		print('Noise:', self.get_description()['noise_list'])
 		fig = self.plot_diffusion(add_swap_marks=True)
 
 		fig = self.plot_mixing_between_replicas(mixing_log_y)

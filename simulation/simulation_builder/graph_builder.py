@@ -328,8 +328,8 @@ class GraphBuilder(object):
 		### Usage:
 		
 		```python
-		# Suppose g is a GraphBuilder object and step that is 
-		# incremented after each mini-batch.
+		# Suppose g is a GraphBuilder object and step is the value  
+		# that is incremented after each mini-batch.
 		# Evaluate train data and store computed values:
 		evaluated = sess.run(g.get_train_ops(dataset_type='train'))
 		g.add_summary(evaluated, step, dataset_type='train')
@@ -476,7 +476,7 @@ class GraphBuilder(object):
 		
 	def _store_tf_graph(self, path): tf.summary.FileWriter(path, self.graph).close()
 	
-	def _cross_entropy_loss(self, y, logits, clip_value_max=100.0):
+	def _cross_entropy_loss(self, y, logits, clip_value_max=1000.0):
 		with tf.name_scope('cross_entropy'):
 			with tf.device('/cpu:0'):
 				cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(

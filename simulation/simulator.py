@@ -304,7 +304,7 @@ class Simulator(object):
 			step = 0
 			
 			with tf.Session() as sess:
-				
+
 				sess.run(iterator.initializer)
 				sess.run(g.variable_initializer)
 				next_batch = iterator.get_next()
@@ -320,8 +320,8 @@ class Simulator(object):
 							feed_dict = g.create_feed_dict(batch['X'], batch['y'])
 							evaluated = sess.run(g.get_train_ops(), 
 								feed_dict=feed_dict)
-							if step % 100 == 0:
-								g.add_summary(evaluated, step=step)
+							
+							g.add_summary(evaluated, step=step)
 
 							### test ###
 							if step % self.test_step == 0 or step == 1:

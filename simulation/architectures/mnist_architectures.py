@@ -186,6 +186,217 @@ def nn_mnist_architecture(graph):
 	return X, y, logits
 
 
+
+
+class NNModel(object):
+
+	def __init__(self, graph, layers, activations=None):
+		
+		assert (isinstace(layers, list) and isinstance(activations, list))
+		assert len(layers) > 1
+
+		n_inputs = layers[0]
+		with graph.as_default():
+			with tf.name_scope('Inputs'):
+				with tf.name_scope('X'):
+					X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+
+				with tf.name_scope('y'):
+					y = tf.placeholder(tf.int64, shape=(None), name='y')
+
+			layer = X
+			for i, n_neurons in enumerate(layers[1:-1]):
+				activation = (tf.nn.relu if activations is None
+					else activations[i])
+				layer = self.nn_layer(layer, n_neurons, 
+					name='hidden'+str(i+1), activation=activation)
+
+			self.logits = self.nn_layer(layer, layers[-1], name='logits')
+			self.X = X
+			self.y = y
+
+	def model(self):
+		return self.X, self.y, self.logits
+
+	def nn_layer(self, X, n_neurons, name, activation=None):
+		"""Creates NN layer.
+
+		Creates NN layer with W's initialized as truncated normal and
+		b's as zeros.
+
+		Args:
+			`X` 		: Input tensor.
+			`n_neurons`	: An integer. Number of neurons in the layer.
+			`name`		: A string. Name of the layer.
+			`activation`: Activation function. Optional.
+
+		"""
+		gpu_device_name = _get_default_gpu_name()
+
+		with tf.name_scope(name):
+			# dimension of each x in X
+			n_inputs = int(X.get_shape()[1])
+
+			stddev = 2.0 / np.sqrt(n_inputs)
+			init = tf.truncated_normal((n_inputs, n_neurons), stddev=stddev)
+
+			with tf.device(_gpu_device_name(0)):
+				W = tf.Variable(init, name='W')
+				
+				
+				b = tf.Variable(tf.zeros([n_neurons]), name='b')
+				
+				
+				Z = tf.matmul(X, W) + b
+				
+
+				if activation is not None:
+					return activation(Z)
+				else:
+					return Z
+
+def nn_mnist_architecture2(graph):
+	"""Creates architecture for NN mnist.
+
+	Returns:
+		logits
+	"""
+	n_inputs = 28*28
+	n_hidden1 = 1024
+	n_hidden2 = 1024
+	n_hidden3 = 2048
+	n_outputs = 10
+	
+	with graph.as_default():
+		with tf.name_scope('Inputs'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+			with tf.name_scope('y'):
+				y = tf.placeholder(tf.int64, shape=(None), name='y')
+		#with tf.name_scope('NN'):
+
+
+			
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+
+		hidden3 = nn_layer(
+			hidden2,
+			n_hidden3,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden3,
+			n_outputs,
+			name='logits')
+		
+	return X, y, logits
+
+def nn_mnist_architecture2_05(graph):
+	"""Creates architecture for NN mnist.
+
+	Returns:
+		logits
+	"""
+	n_inputs = 28*28
+	n_hidden1 = int(1024*0.5)
+	n_hidden2 = int(1024*0.5)
+	n_hidden3 = int(2048*0.5)
+	n_outputs = 10
+	
+	with graph.as_default():
+		with tf.name_scope('Inputs'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+			with tf.name_scope('y'):
+				y = tf.placeholder(tf.int64, shape=(None), name='y')
+		#with tf.name_scope('NN'):
+
+
+			
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+
+		hidden3 = nn_layer(
+			hidden2,
+			n_hidden3,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden3,
+			n_outputs,
+			name='logits')
+		
+	return X, y, logits
+
+def nn_mnist_architecture2_150(graph):
+	"""Creates architecture for NN mnist.
+
+	Returns:
+		logits
+	"""
+	n_inputs = 28*28
+	n_hidden1 = int(1024*1.5)
+	n_hidden2 = int(1024*1.5)
+	n_hidden3 = int(2048*1.5)
+	n_outputs = 10
+	
+	with graph.as_default():
+		with tf.name_scope('Inputs'):
+			with tf.name_scope('X'):
+				X = tf.placeholder(tf.float32, shape=(None, n_inputs), name='X')
+			with tf.name_scope('y'):
+				y = tf.placeholder(tf.int64, shape=(None), name='y')
+		#with tf.name_scope('NN'):
+
+
+			
+		hidden1 = nn_layer(	
+			X, 
+			n_hidden1, 
+			name='hidden1', 
+			activation=tf.nn.relu)
+		
+		hidden2 = nn_layer(
+			hidden1,
+			n_hidden2,
+			name='hidden2',
+			activation=tf.nn.relu)
+
+		hidden3 = nn_layer(
+			hidden2,
+			n_hidden3,
+			name='hidden2',
+			activation=tf.nn.relu)
+		
+		logits = nn_layer(
+			hidden3,
+			n_outputs,
+			name='logits')
+		
+	return X, y, logits
+
+
 def nn_mnist_architecture_dropout(graph):
 	"""Creates architecture for NN mnist.
 
