@@ -1,664 +1,385 @@
+"""Various helper functions.
+'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
+"""
 import os
 import sys
-
-import tensorflow as tf
-from tensorboard.backend.event_processing import event_accumulator
-import numpy as np
-import matplotlib.pyplot as plt
 import json
 import pickle
-import pandas as pd
-import re
 import csv
 
-from simulation.simulation_builder.summary import Dir
+from tensorboard.backend.event_processing import event_accumulator
+import numpy as np
+import pandas as pd
+
+
 from simulation.simulator_exceptions import InvalidExperimentValueError
 from simulation.summary_extractor2 import SummaryExtractor
 
-'export LD_LIBRARY_PATH=LD_LIBRARY_PATH:/usr/local/cuda-9.0/lib64/'
-
 __DEBUG__ = False
 
-"""
-class MultiExperimentSummaryExtractor(object):
-
-	def __init__(self, experiments):
-		experiments = list(set(experiments))
-		self.summary_extractors = {e:SummaryExtractor(e)
-			for e in experiments}
-		self.df = None
-
-	def get_summary_extractor(self, name, simulation_num):
-		try:
-			return self.summary_extractors[name + '_' + str(simulation_num)]
-		except KeyError:
-			sim_numbers = self.summary_extractors.keys().sort(key=lambda x: x.split('_')[-1])
-			print('The max number of simulation is', sim_numbers[-1], ', but given', simulation_num)
-
-	def get_summary_extractor_by_experiment_num(self, experiment_num):
-		try:
-			name = [n for n in self.summary_extractors if str(experiment_num) == n.split('_')[-1]][0]
-		
-			return self.summary_extractors[name]
-		except:
-			return None
-
-	
-	def plot(self, keys, match=None, param_min=None, param_max=None, mark_lines=None, axis_color='royalblue'):
-		def sort_foo(x):
-			return int(x.split('_')[-1])
-		param_names_list = []
-		fig, ax = plt.subplots()
-		keys = keys + ['mean']
-		completed_labels = []
-		for k in sorted(self.summary_extractors, key=sort_foo):
-			extractor = self.summary_extractors[k]
-			for s in extractor.list_available_summaries():
-				summ_name = s.split('/') if match == 'exact' else s
-				if all(x in summ_name for x in keys):
-					x, y = extractor.get_summary(s)
-					
-					js = extractor.get_description()
-					param_name = js['tuning_parameter_name']
-					if param_name == 'tempfactor':
-						param_name = 'temp_factor'
-					param_names_list.append(param_name)
-					param_val = "{:10.2f}".format(float(js[param_name]))
-					if param_min and param_min > float(param_val):
-						continue
-					if param_max and param_max < float(param_val):
-						continue
-					label = k.split('_')[-1] + '_' + param_val +'/'+s
-					
-					if label in completed_labels:
-						continue
-					completed_labels.append(label)
-					if mark_lines and float(param_val) in mark_lines:
-
-						ax.plot(x, y, label=label, linewidth=3.5)
-					else:	
-						ax.plot(x, y, label=label)
-
-		box = ax.get_position()
-		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
-		ax.legend(loc='center right', fancybox=True, shadow=True, 
-			bbox_to_anchor=(1.4, 0.5))
-		ax.title.set_text('Tuning parameter: ' + ', '.join(list(set(param_names_list))))
-		#ax.xaxis.label.set_color('red')
-		#ax.yaxis.label.set_color('red')
-		ax.tick_params(axis='x', colors='royalblue')
-		ax.tick_params(axis='y', colors='royalblue')
-		ax.spines['bottom'].set_color('royalblue')
-		ax.spines['left'].set_color('royalblue')
-
-		return fig
-
-	def create_df(self, variable_names, thresh=0.0, df_name=None):
-		def sort_foo(x):
-			se = self.summary_extractors[x]
-			return se.get_description()['temp_factor']
-
-		df_name = 'None' if df_name is None else df_name
-		experiment_num = 0
-		index = 0
-		df = None
-		summ_extractors_names = list(self.summary_extractors.keys())
-
-		summ_extractors_names.sort(key=sort_foo)
-		for experiment_name in summ_extractors_names:
-			se = self.summary_extractors[experiment_name]
-			summs_names = [n for n in se.list_available_summaries()
-				if all(x in re.split(r"/|_", n) for x in variable_names)]
-
-			for summ_name in summs_names:
-				if 'mean' in summ_name:
-					continue
-				sim_num = int(summ_name.split('/')[0])
-				if 'accept' in variable_names:
-					try:
-						id_ = int(summ_name.split('/')[0])
-					except ValueError:
-						print(summ_name.split('_'))
-						raise
-				else:
-
-					try:
-						id_ = int(re.split(r"/|_", summ_name)[-3])
-					except:
-						print(summ_name)
-						print(re.split(r"/|_", summ_name))
-						raise
-				if df is None:
-					cols = ['experiment', 'simulation', 'id', 'temp_factor']
-					values = se.get_summary(summ_name)
-					start_indx = int(values[0].shape[0]*thresh)
-					v_cols = [v[0] for v in values[0]]
-					cols = cols + v_cols[start_indx:]
-					df = pd.DataFrame(columns=cols)
-				js = se.get_description()
-				temp_factor = js['temp_factor']
-				values = se.get_summary(summ_name)
-				values = [v[0] for v in values[1]]
-				values = [experiment_num, sim_num, id_, temp_factor] + values[start_indx:]
-				try:
-					df.loc[index] = values
-				except ValueError:
-					print(len(values))
-					print(len(cols))
-					raise
-				index += 1
-			experiment_num += 1
-		return df
-		
-
-	def get_last_value_mean_std_report(self, df, experiment_num):
-		n_ids = int(df.id.max())
-
-		df_exp = df[df.experiment==experiment_num]
-
-		columns = df.columns.tolist()[4:]
-		_df = df_exp[columns]
-		res = {}
-
-		for id_ in range(n_ids):
-			d = _df[_df.id==id_]
-			vals = d[[columns[-1]]]
-			mean = vals.mean(axis=0)
-			stddev = vals.std(axis=0, ddof=1)
-			res = {
-				'mean':mean,
-				'stddev':stddev
-			}
-		return res
-
-	def get_best_value_mean_std_report(self, df, experiment_num):
-		n_ids = int(df.id.max())
-
-		df_exp = df[df.experiment==experiment_num]
-
-		columns = df.columns.tolist()[4:]
-		_df = df_exp[columns]
-		res = {}
-
-		for id_ in range(n_ids):
-			d = _df[_df.id==id_]
-			vals = d[d>.00000001].min(axis=1)
-			mean = vals.mean(axis=0)
-			stddev = vals.std(axis=0, ddof=1)
-			res = {
-				'mean':mean,
-				'stddev':stddev
-			}
-		return res
-
-	def get_accept_ratio_mean_std_report(self, df, experiment_num):
-    
-		# ids == replicas or ordered replicas
-		n_ids = int(df.id.max()) + 1
-
-		df_exp = df[df.experiment==experiment_num]
-
-		last_column_name = df.columns.tolist()[-1]
-		res = {}
-		for id_ in range(n_ids):
-			d = df_exp[df_exp.id==id_]
-			d = d[[last_column_name]]
-			stddev = d[[last_column_name]].std(axis=0, ddof=1).tolist()[-1]
-			mean = d[[last_column_name]].mean(axis=0).tolist()[-1]
-			res[id_] = {'mean':mean,
-			'stddev':stddev}
-		return res
-
-	def generate_accept_ratio_data_summarized(self):
-		
-		mean_of_means = []
-		stddev_of_means = []
-		temp_factors = []
-
-		df = self.create_df(['accept', 'ratio', 'replica'])
-
-		for i in range(100):
-			temp_factor = self.get_summary_extractor_by_experiment_num(i)
-			
-			if temp_factor is not None:
-				temp_factor = temp_factor.get_description()['temp_factor']
-			else:
-				break
-			temp_factors.append(temp_factor)
-			report = self.get_accept_ratio_mean_std_report(df, i)
-			mom = self.get_mean_of_means_from_report(report)
-			som = self.get_stddev_of_means_from_report(report)
-
-			mean_of_means.append(mom)
-			stddev_of_means.append(som)
-
-		return mean_of_means, stddev_of_means, temp_factors
-
-	def generate_cross_entropy_data_summarized(self):
-		mean_of_means = []
-		stddev_of_means = []
-		temp_factors = []
-
-		df = self.create_df(['cross', 'replica'])
-		for i in range(100):
-			temp_factor = self.get_summary_extractor_by_experiment_num(i)
-			
-			if temp_factor is not None:
-				temp_factor = temp_factor.get_description()['temp_factor']
-			else:
-				break
-			temp_factors.append(temp_factor)
-			report = self.get_accept_ratio_mean_std_report(df, i)
-			mom = self.get_mean_of_means_from_report(report)
-			som = self.get_stddev_of_means_from_report(report)
-
-			mean_of_means.append(mom)
-			stddev_of_means.append(som)
-
-		return mean_of_means, stddev_of_means, temp_factors
-
-
-
-		
-	def get_mean_of_means_from_report(self, report):
-		means = [report[k]['mean'] for k in report]
-		return sum(means) / len(means)
-		
-	def get_mean_of_stddevs_from_report(self, report):
-		stddevs = [report[k]['stddev'] for k in report]
-		return sum(stddevs) / len(stddevs)
-
-	def get_stddev_of_means_from_report(self, report):
-		means = [report[k]['mean'] for k in report]
-		return np.std(means, ddof=1)
-
-	def get_stddev_of_stddevs_from_report(self, report):
-		stddevs = [report[k]['stddev'] for k in report]
-		return np.std(stddevs, ddof=1)
-
-	def plot_report(self, report):
-		return 1
-"""
-"""
-class SummaryExtractor(object):
-
-	def __init__(self, name):
-		
-
-		self._dir = Dir(name)
-		self.all_summs_dict = {}
-		
-		for i in range(100):
-			try:
-				self.all_summs_dict.update(extract_summary(
-					self._dir.log_dir + self._dir.delim + str(i)), delim=self._dir.delim)
-			except FileNotFoundError: 
-				self.all_summs_dict.pop('delim', None)
-				#print(i, 'simulations')
-				self.n_experiments = i
-				self._create_experiment_averages()
-
-				break
-
-	def get_summary(self, summ_name, split=True):
-		""""""Returns numpy arrays (x, y) of summaries.
-
-		Args:
-			summary_type: Name of the scalar summary
-			
-
-		Returns:
-			(x, y) numpy array
-		""""""
-		if split:
-			return np.hsplit(self.all_summs_dict[summ_name], 2)
-		else:
-			return self.all_summs_dict[summ_name]
-
-	def list_available_summaries(self):
-		return sorted(set([k for k in self.all_summs_dict.keys()]))
-		
-
-	def plot(self, keys=['valid'], match=None, add_swap_marks=False):
-		n_col = 0
-
-		fig, ax = plt.subplots()
-		for s in self.list_available_summaries():
-			summ_name = s.split('/') if match == 'exact' else s
-			if all(x in summ_name for x in keys):
-				x, y = self.get_summary(s)
-				ax.plot(x, y, label=s)
-				n_col += 1
-				
-		box = ax.get_position()
-		ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
-		ax.legend(loc='center right', fancybox=True, shadow=True, 
-			bbox_to_anchor=(1.6, 0.5))
-
-		if add_swap_marks:
-			js = self.get_description()
-			step = js['swap_attempt_step']
-			s = self.list_available_summaries()[0]
-			x, y = self.get_summary(s)
-			len_ = int(x[-1][0])
-			for i in range(0, len_, step):
-				ax.axvline(x=i)
-		return fig
-
-	def get_description(self):
-		d = self._dir.delim
-		file = self._dir.log_dir.replace('summaries'+d, 'summaries'+d+'compressed'+d)
-		with open(os.path.join(file, 'description.json')) as fo:
-			js = json.load(fo)
-
-		return js
-
-	def _create_experiment_averages(self):
-		all_keys = self.list_available_summaries()
-		try:
-			all_keys.sort(key=lambda x: x.split('/')[1] + x.split('/')[-1])
-		except IndexError:
-			
-			raise
-		completed_keys = []
-
-		for k in all_keys:
-			if k in completed_keys:
-				continue
-			name = '/'.join(k.split('/')[1:])
-			arrays = [self.get_summary(str(i) + '/' + name, split=False)
-				for i in range(self.n_experiments)]
-			self.all_summs_dict['mean/' + name] = np.mean(np.array(arrays), axis=0)
-
-"""
-def extract_summary(log_dir, delim="/"):
-	"""
-	Extracts summaries from simulation `name`
-
-	Args:
-		log_dir: directory
-		tag: summary name (e.g. cross_entropy, zero_one_loss ...)
-
-	Returns:
-		A dict where keys are names of the summary scalars and
-		vals are numpy arrays of tuples (step, value)
-
-	"""	
-
-	delim ="\\" if 'win' in sys.platform else '/'
-	
-	compressed_dir = log_dir.replace('summaries'+delim, 'summaries'+delim+'compressed'+delim)
-	summary_filename = os.path.join(compressed_dir, 'summary.pickle') 
-	
-	src_description_file = os.path.join(delim.join(log_dir.split(delim)[:-1]), 'description.json')
-	dst_description_file = os.path.join(delim.join(compressed_dir.split(delim)[:-1]), 'description.json')
-
-	if not os.path.exists(compressed_dir):
-		
-		os.makedirs(compressed_dir)
-
-		with open(src_description_file) as fo:
-			js = json.load(fo)
-		
-		with open(dst_description_file, 'w') as fo:
-			json.dump(js, fo, indent=4)
-			
-
-	if os.path.exists(summary_filename):
-
-		with open(summary_filename, 'rb') as fo:
-			res = pickle.load(fo)
-			return res
-	else:
-
-
-		sim_num = log_dir.split(delim)[-1]
-		res = {}
-		for file in os.listdir(log_dir):
-			fullpath = os.path.join(log_dir, file)
-
-			if os.path.isdir(fullpath):
-			
-				for _file in os.listdir(fullpath):
-					
-					filename = os.path.join(fullpath, _file)
-					
-					ea = event_accumulator.EventAccumulator(filename)
-					ea.Reload()
-					for k in ea.scalars.Keys():
-						lc = np.stack(
-							[np.asarray([scalar.step, scalar.value])
-							for scalar in ea.Scalars(k)])
-						key_name = sim_num + '/' + file + '/' +  k.split('/')[-1]
-						key_name = '/'.join(key_name.split('/')[-3:])
-						res[key_name] = lc
-		
-		with open(summary_filename, 'wb') as fo:
-			pickle.dump(res, fo)
-	
-	
-	return res
+def extract_summary(log_dir, delim="/"): # pylint: disable=too-many-locals
+  """Extracts summaries from simulation `name`
+
+  Args:
+    log_dir: directory
+    tag: summary name (e.g. cross_entropy, zero_one_loss ...)
+
+  Returns:
+    A dict where keys are names of the summary scalars and
+    vals are numpy arrays of tuples (step, value)
+  """
+  delim = ("\\" if 'win' in sys.platform else '/')
+  compressed_dir = log_dir.replace(
+      'summaries'+delim, 'summaries'+delim+'compressed'+delim)
+  summary_filename = os.path.join(compressed_dir, 'summary.pickle')
+  src_description_file = os.path.join(
+      delim.join(log_dir.split(delim)[:-1]), 'description.json')
+  dst_description_file = (os.path.join(
+      delim.join(compressed_dir.split(delim)[:-1]), 'description.json'))
+
+  # pylint: disable=invalid-name
+  if not os.path.exists(compressed_dir):
+    os.makedirs(compressed_dir)
+
+    with open(src_description_file) as fo:
+      js = json.load(fo)
+
+    with open(dst_description_file, 'w') as fo:
+      json.dump(js, fo, indent=4)
+
+
+  if os.path.exists(summary_filename):
+    with open(summary_filename, 'rb') as fo:
+      res = pickle.load(fo)
+      return res
+  else:
+    sim_num = log_dir.split(delim)[-1]
+    res = {}
+    for file in os.listdir(log_dir):
+      fullpath = os.path.join(log_dir, file)
+      if os.path.isdir(fullpath):
+        for _file in os.listdir(fullpath):
+
+          filename = os.path.join(fullpath, _file)
+
+          ea = event_accumulator.EventAccumulator(filename)
+          ea.Reload()
+          for k in ea.scalars.Keys():
+            lc = np.stack(
+                [np.asarray([scalar.step, scalar.value])
+                 for scalar in ea.Scalars(k)])
+            key_name = sim_num + '/' + file + '/' +  k.split('/')[-1]
+            key_name = '/'.join(key_name.split('/')[-3:])
+            res[key_name] = lc
+
+    with open(summary_filename, 'wb') as fo:
+      pickle.dump(res, fo)
+
+  return res
 
 def extract_and_remove_simulation(path):
-	se = SummaryExtractor(path)
-	se._dir.clean_dirs()
+  """Convertes tf summary files to pickle objects and deletes tf files."""
+  se = SummaryExtractor(path) #pylint:disable=invalid-name
+  se._dir.clean_dirs() # pylint: disable=protected-access
 
+# pylint:disable=too-many-arguments, too-many-locals
+def generate_experiment_name(model_name=None,
+                             dataset='mnist',
+                             separation_ratio=None,
+                             do_swaps=True,
+                             n_replicas=None,
+                             beta_0=None,
+                             loss_func_name='crossentropy',
+                             swap_step=None,
+                             burn_in_period=None,
+                             learning_rate=None,
+                             n_epochs=None,
+                             noise_type=None,
+                             batch_size=None,
+                             proba_coeff=1.0,
+                             version='v7'):
+  """Experiment name:
+  <arhictecture>_<dataset>_<tuning parameter>_<optimizer>_...
+  <dynamic=swaps occure/static=swaps don't occur>_...
+  <n_replicas>_<surface view>_<starting_beta_>...
+    version: 'v2' means that summary stores diffusion value
+    version: 'v3' means added burn-in period
+    version: 'v4' learning_rate has been added
+    version: 'v5' has n_epochs in it
+    version: 'v6' has batch_size and noise_type
+    version: 'v7' has proba coefficient + optimizer has been removed
+      + surface_view + swap_proba has been removed
+  """
+  nones = [(x, y)
+           for x, y in zip(locals().keys(), locals().values()) if y is None]
+  loss_func_name = loss_func_name.replace('_', '')
+  # pylint:disable=too-many-boolean-expressions
+  if ((model_name is None or not isinstance(model_name, str))
+      or (dataset is None or  dataset not in ['mnist', 'cifar'])
+      or (separation_ratio is None)
+      or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
+      or (n_replicas is None)
+      or (beta_0 is None)
+      or (loss_func_name is None
+          or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
+      or (swap_step is None)
+      or (burn_in_period is None)
+      or (learning_rate is None)
+      or (n_epochs is None)
+      or (batch_size is None)
+      or (noise_type is None)
+      or (proba_coeff is None)):
+    raise InvalidExperimentValueError(nones)
 
-def generate_experiment_name(architecture_name=None, dataset='mnist', 
-	temp_ratio=None, do_swaps=True, n_replicas=None, beta_0=None, 
-	loss_func_name='crossentropy', swap_attempt_step=None, burn_in_period=None, 
-	learning_rate=None, n_epochs=None, noise_type=None, batch_size=None, 
-	proba_coeff=1.0, version='v7'):
-	
-	
-	"""Experiment name:
-	<arhictecture>_<dataset>_<tuning parameter>_<optimizer>_...
-	<dynamic=swaps occure/static=swaps don't occur>_...
-	<n_replicas>_<surface view>_<starting_beta_>...
+  name = model_name + '_' + dataset + '_'
+  name = name + str(separation_ratio) + '_'
+  name = name + str(do_swaps) + '_' + str(n_replicas) + '_'
+  name = name + str(beta_0) + '_'
+  name = name + loss_func_name + '_' + str(swap_step) + '_'
+  name = name + str(burn_in_period) + '_'
+  name = name + str(learning_rate) + '_' + str(n_epochs) + '_'
+  name = name + str(batch_size) + '_'
+  name = name + str(noise_type.replace('_', '')) + '_'
+  name = name + str(proba_coeff) + '_' + version
 
-		version: 'v2' means that summary stores diffusion value
-		version: 'v3' means added burn-in period 
-		version: 'v4' learning_rate has been added
-		version: 'v5' has n_epochs in it
-		version: 'v6' has batch_size and noise_type
-		version: 'v7' has proba coefficient + optimizer has been removed
-			+ surface_view + swap_proba has been removed
-	"""
-	
-	nones = [(x, y) for x, y in zip(locals().keys(), locals().values()) if y is None]
-	loss_func_name = loss_func_name.replace('_', '')	
+  return name
 
-	if ((architecture_name is None or type(architecture_name) != str) 
-		or (dataset is None or  dataset not in ['mnist', 'cifar'])
-		or (temp_ratio is None) 
-		
-		or (do_swaps is None or do_swaps not in [True, False, 'True', 'False'])
-		or (n_replicas is None)
-		or (beta_0 is None)
-		or (loss_func_name is None or loss_func_name not in ['crossentropy', 'zerooneloss', 'stun'])
-		or (swap_attempt_step is None )
-		or (burn_in_period is None)
-		or (learning_rate is None)
-		or (n_epochs is None)
-		or (batch_size is None)
-		or (noise_type is None)
-		or (proba_coeff is None)):
-		raise InvalidExperimentValueError(nones)
-	#or (optimizer is None or optimizer not in ['PTLD'])
-	#or (surface_view is None or surface_view not in ['energy', 'info'])
-	name = architecture_name + '_' + dataset + '_'
-	name = name + str(temp_ratio) + '_' 
-	name = name + str(do_swaps) + '_' + str(n_replicas) + '_'
-	name = name + str(beta_0) + '_' 
-	name = name + loss_func_name + '_' + str(swap_attempt_step) + '_' + str(burn_in_period) + '_'
-	name = name + str(learning_rate) + '_' + str(n_epochs) + '_' + str(batch_size) + '_'
-	name = name + str(noise_type.replace('_', '')) + '_' +str(proba_coeff) + '_' + version
-
-	return name 
-
+# pylint:disable=inconsistent-return-statements, too-many-return-statements, too-many-branches
 def get_value_from_name(full_name, value):
-	"""Works for names v7 and higher."""
-	
-	if value == 'architecture_name':
-		return full_name.split('_')[0]
+  """Works for names v7 and higher."""
+  # pylint:disable=no-else-return
+  if value == 'model_name':
+    return full_name.split('_')[0]
 
-	elif value == 'dataset':
-		return full_name.split('_')[1]
+  elif value == 'dataset':
+    return full_name.split('_')[1]
 
-	elif value == 'temp_ratio':
-		return full_name.split('_')[2]
+  elif value == 'temp_ratio':
+    return float(full_name.split('_')[2])
 
-	#elif value == 'optimizer':
-	#	full_name.split('_')[3]
+  elif value == 'do_swaps':
+    return full_name.split('_')[3]
 
-	elif value == 'do_swaps':
-		return full_name.split('_')[3]
+  elif value == 'n_replicas':
+    return int(full_name.split('_')[4])
 
-	elif value == 'n_replicas':
-		return full_name.split('_')[4]
+  elif value == 'beta_0':
+    return float(full_name.split('_')[5])
 
-	#elif value == 'surface_view':
-	#	return full_name.split('_')[7]
+  elif value == 'loss_func_name':
+    return full_name.split('_')[6]
 
-	elif value == 'beta_0':
-		return full_name.split('_')[5]
+  elif value == 'swap_step':
+    return float(full_name.split('_')[7])
 
-	elif value == 'loss_func_name':
-		return full_name.split('_')[6]
+  elif value == 'burn_in_period':
+    return float(full_name.split('_')[8])
 
-	elif value == 'swap_attempt_step':
-		return full_name.split('_')[7]
+  elif value == 'learning_rate':
+    return float(full_name.split('_')[9])
 
-	elif value == 'burn_in_period':
-		return full_name.split('_')[8]
+  elif value == 'n_epochs':
+    return int(full_name.split('_')[10])
 
-	elif value == 'learning_rate':
-		return full_name.split('_')[9]
+  elif value == 'batch_size':
+    return int(full_name.split('_')[11])
 
-	elif value == 'n_epochs':
-		return full_name.split('_')[10]
+  elif value == 'noise_type':
+    return full_name.split('_')[12]
 
-	elif value == 'batch_size':
-		return full_name.split('_')[11]
+  elif value == 'proba_coeff':
+    return float(full_name.split('_')[13])
 
-	elif value == 'noise_type':
-		return full_name.split('_')[12]
-
-	elif value == 'proba_coeff':
-		full_name.split('_')[13]
-
-	else:
-		raise ValueError('Invalid value')
+  else:
+    raise ValueError('Invalid value:', value)
 
 def clean_dirs(dir_):
-    """Recursively removes all train, test and validation summary files \
-            and folders from previos training life cycles."""
+  """Recursively removes all train, test and validation summary files \
+      and folders from previos training life cycles."""
 
+  try:
+    for file in os.listdir(dir_):
+      if os.path.isfile(os.path.join(dir_, file)):
+        os.remove(os.path.join(dir_, file))
+      else:
+        clean_dirs(os.path.join(dir_, file))
+
+    os.rmdir(dir_)
+  except OSError:
+    # if first simulation, nothing to delete
+    return
+
+
+class GlobalDescriptor(object): # pylint:disable=useless-object-inheritance
+  """Helper for working with summary files."""
+  def __init__(self):
+    self.delim = "\\" if 'win' in sys.platform else '/'
+    current_dir = self.delim.join(
+        os.path.abspath(__file__).split(self.delim)[:-1])
+    self.summaries_dir = os.path.join(current_dir, 'summaries')
+    self.logfile_path = os.path.join(self.summaries_dir, 'test_logs.csv')
+
+    self.columns = [
+        'model_name',
+        'noise_type',
+        'n_epochs',
+        'learning_rate',
+        'n_replicas',
+        'swap_step',
+        'temp_factor',
+        'beta_0',
+        'burn_in_period',
+        'proba_coeff',
+        'batch_size',
+        'cross_entropy',
+        'zero_one',
+        'accept_ratio',
+        'travel_time',
+        'part_mix_ratio',
+        'mix_ratio',
+        ]
+
+  def add_row(self, filename):
+    """Adds row to the csv files."""
+    # pylint:disable=invalid-name
+    se = SummaryExtractor(filename)
+    d = se.get_description()
+    vals = [
+        filename.split('_')[0],
+        d['noise_type'],
+        d['n_epochs'],
+        d['learning_rate'],
+        d['n_replicas'],
+        d['swap_step'],
+        d['temp_factor'],
+        d['noise_list'][0],
+        d['burn_in_period'],
+        d['proba_coeff'],
+        d['batch_size'],
+        ]
+    # pylint:disable=protected-access, invalid-name
+    xentropy = se.get_min_val('0/test_ordered_0/cross_entropy')
+    v = float("{0:.4f}".format(xentropy[1]))
+    vals = vals + [(v, int(xentropy[0]))]
+
+    zero_one = se.get_min_val('0/test_ordered_0/zero_one_loss')
+    v = float("{0:.4f}".format(zero_one[1]))
+    vals = vals + [(v, int(zero_one[0]))]
+
+    _, acc, err = se.get_accept_ratio_vs_separation_ratio_data()
+    acc = float("{0:.4f}".format(acc))
+    err = float("{0:.4f}".format(err))
+    vals = vals + [str(acc) + '+/-' + str(err)]
+
+    t_time, _, err = se.get_travel_time_vs_separation_ratio_data()
+    v = float("{0:.4f}".format(t_time))
+    err = float("{0:.4f}".format(err))
+    vals = vals + [str(v) + '+/-' + str(err)]
+
+    part_mix_ratio = float("{0:.4f}".format(se._get_visiting_ratio_data()))
+    vals = vals + [part_mix_ratio]
+
+    mix_ratio = float("{0:.4f}".format(se._get_mixing_ratio_data()))
+    vals = vals + [mix_ratio]
+
+    if not os.path.exists(self.logfile_path):
+      with open(self.logfile_path, 'w') as fo:
+        writer = csv.writer(fo)
+        writer.writerow(self.columns)
+
+    with open(self.logfile_path, 'a') as fo:
+      writer = csv.writer(fo)
+      writer.writerow(vals)
+
+  def get_dataframe(self):
+    """Returns dataframe."""
+    df = pd.read_csv(self.logfile_path)# pylint:disable=invalid-name
+    return df
+
+  def print_param_ranges(self, token='v7'): # pylint:disable=no-self-use
+    """Prints all available hyperparams in files containing `token`."""
+    path = os.path.join('simulation', 'summaries')
+    path = os.path.join(path, 'compressed')
+    files = [f for f in os.listdir(path)
+             if token in f]
+
+    model_names = [get_value_from_name(f, 'model_name')
+                   for f in files]
+    model_names = list(set(model_names))
+
+    sep_ratios = [get_value_from_name(f, 'temp_ratio')
+                  for f in files]
+    sep_ratios = list(set(sep_ratios))
     try:
-        for file in os.listdir(dir_):
-            if os.path.isfile(os.path.join(dir_, file)):
-                os.remove(os.path.join(dir_, file))
-            else:
-                clean_dirs(os.path.join(dir_, file))
+      sep_ratios = sorted([float(x) for x in sep_ratios])
+    except: # pylint:disable=bare-except
+      pass
 
-        os.rmdir(dir_)
-    except OSError:
-        # if first simulation, nothing to delete
-        return
+    swap_steps = [get_value_from_name(f, 'swap_step')
+                  for f in files]
+    swap_steps = list(set(swap_steps))
+    swap_steps = sorted([float(x) for x in swap_steps])
 
+    burn_in_period = [get_value_from_name(f, 'burn_in_period')
+                      for f in files]
+    burn_in_period = sorted(list(set(burn_in_period)))
 
-class GlobalDescriptor(object):
-	def __init__(self):
-		self.delim = "\\" if 'win' in sys.platform else '/'
-		current_dir = self.delim.join(os.path.abspath(__file__).split(self.delim)[:-1])
-		self.summaries_dir = os.path.join(current_dir, 'summaries')
-		self.logfile_path = os.path.join(self.summaries_dir, 'test_logs.csv')
-		"""
-		self.columns = ['surface_view', 'learning_rate', 'noise_type', 
-		'n_simulations', 'batch_size', 'noise_list', 'description', 
-		'n_replicas', 'n_epochs', 'swap_attempt_step', 
-		'burn_in_period', 'proba_coeff', 'name', 
-		'tuning_parameter_name', 'temp_factor']
-		"""
+    learning_rate = [get_value_from_name(f, 'learning_rate')
+                     for f in files]
+    learning_rate = sorted(list(set(learning_rate)))
+    learning_rate = [float(x) for x in learning_rate]
 
-		self.columns = [
-			'model_name',
-			'noise_type',
-			'n_epochs',
-			'learning_rate',
-			'n_replicas',
-			'swap_attempt_step',
-			'temp_factor',
-			'beta_0',
-			'burn_in_period',
-			'proba_coeff',
-			'batch_size',
-			'cross_entropy',
-			'zero_one',
-			'accept_ratio',
-			'travel_time',
-			'part_mix_ratio',
-			'mix_ratio',
+    batch_size = [get_value_from_name(f, 'batch_size')
+                  for f in files]
+    batch_size = sorted(list(set(batch_size)))
+    batch_size = [float(x) for x in batch_size]
 
+    proba_coeff = [get_value_from_name(f, 'proba_coeff')
+                   for f in files]
+    proba_coeff = sorted(list(set(proba_coeff)))
+    proba_coeff = [float(x) for x in proba_coeff]
 
-			]
+    print('Files found:', len(files))
+    print('model names:', model_names)
+    print('separation ratios:', sep_ratios)
+    print('swap steps:', swap_steps)
+    print('burn in periods:', burn_in_period)
+    print('batch sizes:', batch_size)
+    print('learning rates:', learning_rate)
+    print('proba coeffs:', proba_coeff)
 
-	def add_row(self, filename):
-		se = SummaryExtractor(filename)
-		d = se.get_description()
-		vals = [
-			filename.split('_')[0],
-			d['noise_type'],
-			d['n_epochs'],
-			d['learning_rate'],
-			d['n_replicas'],
-			d['swap_attempt_step'],
-			d['temp_factor'],
-			d['noise_list'][0],
-			d['burn_in_period'],
-			d['proba_coeff'],
-			d['batch_size'],
-			]
+  # pylint:disable=no-self-use, unused-argument
+  def filter_filenames(
+      self, token='v7', model_name=None,
+      learning_rate=None, burn_in_period=None,
+      temp_factor=None, batch_size=None,
+      swap_step=None, proba_coeff=None,
+      beta_0=None):
+    """Filters files that has `token` based on args.
 
-		xentropy = se.get_min_val('0/test_ordered_0/cross_entropy')
-		v = float("{0:.4f}".format(xentropy[1]))
-		vals = vals + [(v, int(xentropy[0]))]
+    Returns: A list of files satisfying arguments.
+    """
+    locals_ = locals().copy()
+    locals_.pop('token')
+    locals_.pop('self')
+    keys = list(locals_.keys())
+    _ = [locals_.pop(k) for k in keys if locals_[k] is None]
+    if not all(isinstance(locals_[k], list) for k in locals_):
+      raise TypeError('arguments must be lists')
 
-		zero_one = se.get_min_val('0/test_ordered_0/zero_one_loss')
-		v = float("{0:.4f}".format(zero_one[1]))
-		vals = vals + [(v, int(zero_one[0]))]
+    path = os.path.join('simulation', 'summaries')
+    path = os.path.join(path, 'compressed')
+    files = [f for f in os.listdir(path)
+             if token in f]
+    result = []
 
-		sep, acc, err = se.get_accept_ratio_vs_separation_ratio_data()
-		acc = float("{0:.4f}".format(acc))
-		err = float("{0:.4f}".format(err))
-		vals = vals + [str(acc) + '+/-' + str(err)]
+    for file in files:
+      bool_test = []
+      for key in locals_:
+        val = get_value_from_name(file, key)
+        bool_test.append(val in locals_[key])
 
-		t_time, sep_ratio, err = se.get_travel_time_vs_separation_ratio_data()
-		v = float("{0:.4f}".format(t_time))
-		err = float("{0:.4f}".format(err))
-		vals = vals + [str(v) + '+/-' + str(err)]
+      if all(bool_test):
+        result.append(file)
 
-		part_mix_ratio = float("{0:.4f}".format(se._get_partial_mixing_ratio_data()))
-		vals = vals + [part_mix_ratio]
-		
-
-		mix_ratio = float("{0:.4f}".format(se._get_mixing_ratio_data()))
-		vals = vals + [mix_ratio]
-
-		
-		
-
-		if not os.path.exists(self.logfile_path):
-			with open(self.logfile_path, 'w') as fo:
-				writer = csv.writer(fo)
-				writer.writerow(self.columns)
-
-		with open(self.logfile_path, 'a') as fo:
-			writer = csv.writer(fo)
-			writer.writerow(vals)
-
-	def get_dataframe(self):
-		df = pd.read_csv(self.logfile_path)
-		return df
-
-
+    return result
