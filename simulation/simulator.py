@@ -190,7 +190,6 @@ class Simulator: # pylint: disable=too-many-instance-attributes
     self.burn_in_period = burn_in_period
     self.loss_func_name = loss_func_name
     self.proba_coeff = proba_coeff
-
     self.batch_size = batch_size
     self.n_epochs = n_epochs
     self.test_step = test_step
@@ -201,8 +200,8 @@ class Simulator: # pylint: disable=too-many-instance-attributes
     tf.logging.set_verbosity(tf.logging.ERROR)
     self.delim = "\\" if 'win' in sys.platform else "/"
     self._dir = Dir(name)
-    if description:
-      self._log_params(description)
+    self.description = description
+    self._log_params()
 
     self.rmsprop_decay = rmsprop_decay
     self.rmsprop_momentum = rmsprop_momentum
@@ -397,7 +396,7 @@ class Simulator: # pylint: disable=too-many-instance-attributes
     self.train_PTLD(kwargs)
 
 
-  def _log_params(self, desciption):
+  def _log_params(self):
     """Creates a description file."""
     dirpath = self._dir.log_dir
     filepath = os.path.join(dirpath, 'description.json')
@@ -416,7 +415,7 @@ class Simulator: # pylint: disable=too-many-instance-attributes
         'n_simulations': self.n_simulations,
         'tuning_parameter_name':self.tuning_parameter_name,
         'surface_view':self.surface_view,
-        'description':desciption,
+        'description':self.description,
         'burn_in_period':self.burn_in_period,
         'proba_coeff':self.proba_coeff
     }
