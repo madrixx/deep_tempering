@@ -436,6 +436,6 @@ class Simulator: # pylint: disable=too-many-instance-attributes
     self.stdout_write(buff)
 
   def stdout_write(self, buff): # pylint: disable=no-self-use
-    """Writes to stdout buffer with back of the line."""
+    """Writes to stdout buffer with beginning of the line character."""
     sys.stdout.write('\r' + buff)
     sys.stdout.flush()

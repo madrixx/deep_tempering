@@ -61,13 +61,10 @@ class Summary: # pylint: disable=too-many-instance-attributes
         If `ordered_summary`, the values for each replica in
         ordered form.
         If None, stores both.
-
-        UPDATE: Should be None all the time, because
+        **WARNING**: Should be None all the time, because
         SummaryExtractor object uses both. Otherwise, the
         extraction of summaries must be implemented differently.
-
     """
-
     self.graph = graph
     self.n_replicas = n_replicas
     self.name = name

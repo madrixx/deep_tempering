@@ -352,7 +352,7 @@ class GlobalDescriptor(object): # pylint:disable=useless-object-inheritance
   def filter_filenames(
       self, token='v7', model_name=None,
       learning_rate=None, burn_in_period=None,
-      temp_factor=None, batch_size=None,
+      separation_ratio=None, batch_size=None,
       swap_step=None, proba_coeff=None,
       beta_0=None):
     """Filters files that has `token` based on args.

@@ -26,7 +26,6 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
   exchanges between two ensembles and storing the summary
   values. It is used to train models in the
   Parallel Tempering framework.
-
   """
 
   def __init__(self, model, learning_rate, noise_list, name, # pylint: disable=too-many-locals, too-many-branches, too-many-arguments, too-many-statements
@@ -200,8 +199,7 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
                 decay=rmsprop_decay, momentum=rmsprop_momentum,
                 epsilon=rmsprop_epsilon)
 
-          elif (noise_type.lower() == 'dropout_gd'
-                or noise_type.lower() == 'dropout'):
+          elif noise_type.lower() in ['dropout_gd', 'dropout']:
             optimizer = GDOptimizer(
                 self._learning_rate, i, self._noise_list)
 
@@ -225,7 +223,7 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
                              cross_entropy/zero_one_loss/stun,',
                              'But given:', self._loss_func_name)
 
-      # The Summary objects helps to store summaries
+      # The Summary object helps to store summaries
       self._summary = Summary(
           self._graph, self._n_replicas, self._name,
           self._cross_entropy_loss_dict, self._zero_one_loss_dict,
@@ -254,6 +252,9 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
       If noise_type is 'dropout' and dataset_type is 'train',
       adds values for keeping parameters during optimization
       (placeholders keep_prob for each replica).
+
+    Raises:
+      InvalidDatasetTypeError: if incorrect `dataset_type`.
     """
 
     feed_dict = {self.X:X_batch, self.y:y_batch}
@@ -303,7 +304,7 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
       train_ops for session run.
 
     Raises:
-      InvalidDatasetTypeError if incorrect dataset_type
+      InvalidDatasetTypeError if incorrect dataset_type.
     """
 
     loss = [self._cross_entropy_loss_dict[i]
@@ -367,10 +368,10 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
       tensor_type: One of 'cross_entropy'/'zero_one_loss'/'stun'/'summary'
 
     Returns:
-      A list of specified (by tensor_type) tensors.
+      A list of specified (by `tensor_type`) tensors.
 
     Raises:
-      InvlaidLossFuncError: Incorrect tensor_type value.
+      InvlaidLossFuncError: Incorrect `tensor_type` value.
       """
 
     if tensor_type == 'cross_entropy': # pylint: disable=no-else-return
@@ -398,14 +399,18 @@ class GraphBuilder: # pylint: disable=too-many-instance-attributes
     Swaps according to:
       1. Uniformly randomly select a pair of adjacent temperatures
         1/beta_i and 1/beta_i+1, for which swap move is proposed.
-      2. Compute the acceptance ratio for the proposed swap.
-      If surface_view is 'information', accept with probability:
-        min{1, exp((beta_i-beta_i+1)*(loss_i/beta_i-loss_i+1/beta_i+1)}
-      if surface_view is 'energy', accept with probability:
-        min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)}
+      2. Swap according to:
+          If surface_view is 'information', accept with probability:
+            min{1, exp((beta_i-beta_i+1)*(loss_i/beta_i-loss_i+1/beta_i+1)}
+          if surface_view is 'energy', accept with probability:
+            min{1, exp((beta_i-beta_i+1)*(loss_i-loss_i+1)}
+      3. Update the acceptance ratio for the proposed swap.
 
     Args:
       evaluated: a list returned by sess.run(get_train_ops())
+
+    Raises:
+      ValueError: if invalid `surface_view`.
     """
     random_pair = random.choice(range(self._n_replicas - 1)) # pair number
 

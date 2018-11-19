@@ -148,7 +148,9 @@ class Plot:
              ylabel=None,
              title=None,
              log_x=None,
-             log_y=None):
+             log_y=None,
+             fig_width=12,
+             fig_height=4.5):
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width*2, box.height*2])
     ax.legend(
@@ -166,7 +168,7 @@ class Plot:
     if log_y is not None:
       plt.yscale('log', basey=log_y)
 
-    fig.set_size_inches(12, 4.5) # (width, height)
+    fig.set_size_inches(fig_width, fig_height) # (width, height)
     self.__first_use = False
 
   def plot( # pylint:disable=invalid-name
