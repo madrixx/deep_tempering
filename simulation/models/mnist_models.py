@@ -41,7 +41,10 @@ def nn_layer(X, n_neurons, name, activation=None): # pylint: disable=invalid-nam
       else:
         return Z
 
-############################ WORKING ARCHITECTURES ############################
+def resblock(x_init, channels, use_bias=True, downsample=False, scope='resblock'):
+  return 1
+
+############################ WORKING MODELS ############################
 
 def nn_mnist_model_075(graph):
   n_inputs = 28*28
@@ -328,3 +331,26 @@ def nn_mnist_model_dropout(graph): # pylint: disable=too-many-locals
         n_outputs,
         name='logits')
   return X, y, keep_prob, logits
+
+def resnet_mnist(graph):
+
+  img_size = 28
+  c_dim = 1
+  label_dim = 10
+
+  with graph.as_default():
+    with tf.name_scope('Inputs'):
+      with tf.name_scope('X'):
+        X = tf.placeholder(tf.float32, shape=(None, width*height), name='X')
+        X_reshaped = tf.reshape(x, [None, width , height, -1])
+
+      with tf.name_scope('y'):
+        y = tf.placeholder(tf.float32, shape=(None), name='y')
+
+    with tf.name_scope('conv0'):
+      net = tf.layers.conv2d(
+          X_reshaped, 16, [3,3], strides=1, padding='SAME', use_bias=False,
+          kernel_initilizer=tf.contrib.layers.variance_scaling_initializer(
+              seed=seed),
+          )
+      net = tf.layers.batch_normalization(net, training)
