@@ -21,7 +21,6 @@ test_labels = mnist.test.labels
 valid_data = mnist.validation.images
 valid_labels = mnist.validation.labels
 
-
 # set simulation parameters
 batch_size = 50
 n_epochs = 5
